@@ -29,7 +29,7 @@ export async function estimateTaskDifficulty(title: string, customApiKey?: strin
   try {
     const ai = getAIClient(customApiKey);
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.5-flash",
       contents: `사용자가 등록한 공부 할 일 제목: "${title}"
 이 할 일의 난이도를 다음 5가지 기준을 바탕으로 분석해주세요:
 1. 예상 소요 시간
@@ -83,7 +83,7 @@ export async function analyzeUserMemoryIntent(message: string, customApiKey?: st
   try {
     const ai = getAIClient(customApiKey);
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.5-flash",
       contents: `사용자 메시지를 분석하여, 사용자가 자신의 정보(일과, 공부 습관, 운동 루틴, 목표, 선호 학습 방식, 집중 시간대 등)를 기억하거나 저장해달라고 명시적으로 요청했는지 판단하세요.
 (예: "내 평일 일정 기억해줘", "이 루틴 저장해줘", "내 공부 습관 기억해줘" 등)
 단순한 대화나 질문이라면 저장하지 않습니다.
@@ -125,7 +125,7 @@ export async function generateAIStudyFeedback(stats: {
   try {
     const ai = getAIClient(customApiKey);
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.5-flash",
       contents: `다음 학습 통계를 분석하여 따뜻하고 구체적인 피드백과 내일의 학습 가이드를 한글로 3~4줄 요약해서 작성해주세요.
 - 총 공부 시간: ${stats.totalStudyTime}분
 - 완료한 일: ${stats.completedCount}개, 부분 완료: ${stats.partialCount}개, 미완료: ${stats.failedCount}개
@@ -157,7 +157,7 @@ export async function getAIStudyMateResponse(
 
     const ai = getAIClient(customApiKey);
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.5-flash",
       contents: [
         ...formattedHistory.map(h => ({ role: h.role, parts: [{ text: h.parts[0].text }] })),
         { role: "user", parts: [{ text: message }] }
@@ -193,7 +193,7 @@ export async function generateAutoStudyPlan(input: {
   try {
     const ai = getAIClient(customApiKey);
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.5-flash",
       contents: `시험까지 ${input.daysLeft}일이 남았고, 하루에 ${input.dailyTime}시간 공부가 가능합니다.
 공부할 과목들: ${input.subjects.join(", ")}
 

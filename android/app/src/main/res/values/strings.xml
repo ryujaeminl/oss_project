@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Woolini Study Planner</string>
+    <string name="title_activity_main">Woolini Study Planner</string>
+    <string name="package_name">com.woolini.app</string>
+    <string name="custom_url_scheme">com.woolini.app</string>
+</resources>

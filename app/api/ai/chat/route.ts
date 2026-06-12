@@ -35,6 +35,14 @@ export async function POST(req: Request) {
       });
     }
 
+    // Save the user's actual chat messages/questions as well
+    const questionId = `q_${Date.now()}`;
+    await upsertStudyRecord(userId, questionId, `[질문] ${message}`, {
+      type: "user_question",
+      userId,
+      text: message,
+    });
+
     // 2. RAG: Search Pinecone if user asks for plans, routines, schedules, etc.
     const keywords = ["계획", "루틴", "일정", "추천", "습관", "목표", "기억", "학습 방식", "집중", "스케줄", "일과", "하루", "생활"];
     const shouldRetrieve = keywords.some(keyword => message.includes(keyword));

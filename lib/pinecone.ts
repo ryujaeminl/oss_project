@@ -1,9 +1,34 @@
 import { Pinecone } from "@pinecone-database/pinecone";
 import { GoogleGenAI } from "@google/genai";
+import fs from "fs";
+import path from "path";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || "placeholder_key",
 });
+
+const LOCAL_DB_PATH = path.join(process.cwd(), "local_db.json");
+
+function readLocalDb() {
+  try {
+    if (!fs.existsSync(LOCAL_DB_PATH)) {
+      return {};
+    }
+    const data = fs.readFileSync(LOCAL_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (e) {
+    console.error("Local DB read error:", e);
+    return {};
+  }
+}
+
+function writeLocalDb(data: any) {
+  try {
+    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Local DB write error:", e);
+  }
+}
 
 const pc =
   process.env.PINECONE_API_KEY && process.env.PINECONE_API_KEY !== "placeholder_key"
@@ -42,8 +67,28 @@ export async function upsertStudyRecord(
   text: string,
   metadata: Record<string, any>
 ) {
+  const id = `${userId}_${recordId}`;
+  const recordData = {
+    userId,
+    text,
+    ...metadata,
+    timestamp: new Date().toISOString(),
+  };
+
   if (!pc) {
-    console.log("Pinecone client not initialized (missing API key)");
+    const db = readLocalDb();
+    if (!db.study_records) {
+      db.study_records = [];
+    }
+    // Remove if duplicate id exists
+    db.study_records = db.study_records.filter((r: any) => r.id !== id);
+    db.study_records.push({
+      id,
+      userId,
+      text,
+      metadata: recordData,
+    });
+    writeLocalDb(db);
     return;
   }
   try {
@@ -55,14 +100,9 @@ export async function upsertStudyRecord(
     await index.upsert({
       records: [
         {
-          id: `${userId}_${recordId}`,
+          id,
           values: embedding,
-          metadata: {
-            userId,
-            text,
-            ...metadata,
-            timestamp: new Date().toISOString(),
-          },
+          metadata: recordData,
         },
       ]
     });
@@ -73,8 +113,31 @@ export async function upsertStudyRecord(
 
 export async function queryStudyRecords(userId: string, queryText: string, limit = 5) {
   if (!pc) {
-    console.log("Pinecone client not initialized (missing API key)");
-    return [];
+    const db = readLocalDb();
+    const records = db.study_records || [];
+    
+    // Fallback: simple case-insensitive text search on userId match
+    const matches = records.filter((r: any) => {
+      const isUser = r.userId === userId;
+      if (!isUser) return false;
+      
+      const term = queryText.toLowerCase();
+      const textMatch = r.text.toLowerCase().includes(term);
+      const metaMatch = r.metadata && Object.values(r.metadata).some(
+        (val) => typeof val === "string" && val.toLowerCase().includes(term)
+      );
+      
+      return textMatch || metaMatch;
+    });
+
+    // Sort by timestamp descending
+    matches.sort((a: any, b: any) => {
+      const timeA = new Date(a.metadata?.timestamp || 0).getTime();
+      const timeB = new Date(b.metadata?.timestamp || 0).getTime();
+      return timeB - timeA;
+    });
+
+    return matches.slice(0, limit).map((m: any) => m.metadata) || [];
   }
   try {
     const embedding = await getEmbedding(queryText);
@@ -97,7 +160,20 @@ export async function queryStudyRecords(userId: string, queryText: string, limit
 }
 
 export async function findUserByEmail(email: string) {
-  if (!pc) return null;
+  const emailClean = email.toLowerCase().trim();
+  if (!pc) {
+    const db = readLocalDb();
+    const id = `user_${Buffer.from(emailClean).toString("hex")}`;
+    if (db[id]) {
+      const user = db[id];
+      return {
+        id,
+        ...user,
+        tasks: typeof user.tasks === "string" ? JSON.parse(user.tasks) : (user.tasks || []),
+      };
+    }
+    return null;
+  }
   try {
     const indexName = process.env.PINECONE_INDEX_NAME || "study-planner-index";
     const host = process.env.PINECONE_HOST;
@@ -155,10 +231,6 @@ export async function findUserByEmail(email: string) {
 }
 
 export async function createUser(data: { email: string; name?: string; password?: string; image?: string; goalTime?: number }) {
-  if (!pc) throw new Error("Pinecone client not initialized (missing API key)");
-  const indexName = process.env.PINECONE_INDEX_NAME || "study-planner-index";
-  const host = process.env.PINECONE_HOST;
-  const index = host ? pc.index(indexName, host) : pc.index(indexName);
   const emailClean = data.email.toLowerCase().trim();
   const id = `user_${Buffer.from(emailClean).toString("hex")}`;
   
@@ -175,6 +247,21 @@ export async function createUser(data: { email: string; name?: string; password?
     tasks: "[]",
     createdAt: new Date().toISOString(),
   };
+
+  if (!pc) {
+    const db = readLocalDb();
+    db[id] = metadata;
+    writeLocalDb(db);
+    return {
+      id,
+      ...metadata,
+      tasks: [],
+    };
+  }
+
+  const indexName = process.env.PINECONE_INDEX_NAME || "study-planner-index";
+  const host = process.env.PINECONE_HOST;
+  const index = host ? pc.index(indexName, host) : pc.index(indexName);
 
   await index.upsert({
     records: [
@@ -194,17 +281,6 @@ export async function createUser(data: { email: string; name?: string; password?
 }
 
 export async function updateUser(id: string, data: Record<string, any>) {
-  if (!pc) throw new Error("Pinecone client not initialized (missing API key)");
-  const indexName = process.env.PINECONE_INDEX_NAME || "study-planner-index";
-  const host = process.env.PINECONE_HOST;
-  const index = host ? pc.index(indexName, host) : pc.index(indexName);
-
-  const fetchResult = await index.fetch({ ids: [id] });
-  if (!fetchResult.records || !fetchResult.records[id]) {
-    throw new Error("User not found in Pinecone");
-  }
-
-  const existingMetadata = fetchResult.records[id].metadata || {};
   const cleanData = { ...data };
   
   // Stringify tasks array to JSON string for Pinecone
@@ -217,6 +293,44 @@ export async function updateUser(id: string, data: Record<string, any>) {
       delete cleanData[key];
     }
   });
+
+  if (!pc) {
+    const db = readLocalDb();
+    if (!db[id]) {
+      throw new Error("User not found in local DB");
+    }
+    const updatedMetadata = {
+      ...db[id],
+      ...cleanData,
+    };
+    db[id] = updatedMetadata;
+    writeLocalDb(db);
+
+    const returnedMetadata = { ...updatedMetadata };
+    if (typeof returnedMetadata.tasks === "string") {
+      try {
+        returnedMetadata.tasks = JSON.parse(returnedMetadata.tasks);
+      } catch {
+        returnedMetadata.tasks = [];
+      }
+    }
+
+    return {
+      id,
+      ...returnedMetadata,
+    };
+  }
+
+  const indexName = process.env.PINECONE_INDEX_NAME || "study-planner-index";
+  const host = process.env.PINECONE_HOST;
+  const index = host ? pc.index(indexName, host) : pc.index(indexName);
+
+  const fetchResult = await index.fetch({ ids: [id] });
+  if (!fetchResult.records || !fetchResult.records[id]) {
+    throw new Error("User not found in Pinecone");
+  }
+
+  const existingMetadata = fetchResult.records[id].metadata || {};
 
   const updatedMetadata = {
     ...existingMetadata,
