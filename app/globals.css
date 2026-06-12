@@ -1,0 +1,239 @@
+/* 기존 단일 HTML(code.html) 내부의 CSS 스타일 및 테마 변수를 Next.js 글로벌 스타일시트 및 Tailwind CSS v4 사양으로 통합 전환한 파일입니다. */
+@import "tailwindcss";
+
+
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-secondary: #655978;
+  --color-inverse-primary: #9dd0c9;
+  --color-surface-dim: #d8dadd;
+  --color-on-secondary-fixed-variant: #4d4160;
+  --color-on-surface-variant: #404847;
+  --color-surface-container: #eceef1;
+  --color-on-primary-container: #2e605a;
+  --color-surface-container-lowest: #ffffff;
+  --color-tertiary: #665f34;
+  --color-on-tertiary-fixed: #201c00;
+  --color-primary: #356761;
+  --color-on-primary-fixed-variant: #1b4e4a;
+  --color-outline-variant: #c0c8c6;
+  --color-secondary-fixed-dim: #d0c0e5;
+  --color-on-primary-fixed: #00201d;
+  --color-tertiary-fixed-dim: #d1c794;
+  --color-primary-fixed-dim: #9dd0c9;
+  --color-surface-container-high: #e6e8eb;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #6a5d7d;
+  --color-secondary-fixed: #ecdcff;
+  --color-inverse-surface: #2d3133;
+  --color-on-background: #191c1e;
+  --color-tertiary-fixed: #eee3ad;
+  --color-on-tertiary: #ffffff;
+  --color-primary-container: #a5d8d1;
+  --color-surface: #f7f9fc;
+  --color-error-container: #ffdad6;
+  --color-surface-container-low: #f2f4f7;
+  --color-on-tertiary-fixed-variant: #4e471f;
+  --color-background: #f7f9fc;
+  --color-surface-tint: #356761;
+  --color-outline: #707977;
+  --color-error: #ba1a1a;
+  --color-surface-container-highest: #e0e3e6;
+  --color-on-surface: #191c1e;
+  --color-on-tertiary-fixed-variant: #4e471f;
+  --color-background: #f7f9fc;
+  --color-surface-tint: #356761;
+  --color-outline: #707977;
+  --color-error: #ba1a1a;
+  --color-surface-container-highest: #e0e3e6;
+  --color-on-surface: #191c1e;
+  --color-on-tertiary-container: #5f582e;
+  --color-on-error: #ffffff;
+  --color-inverse-on-surface: #eff1f4;
+  --color-tertiary-container: #d9cf9b;
+  --color-on-primary: #ffffff;
+  --color-surface-variant: #e0e3e6;
+  --color-secondary-container: #e9d9ff;
+  --color-primary-fixed: #b9ede5;
+  --color-on-error-container: #93000a;
+  --color-surface-bright: #f7f9fc;
+  --color-on-secondary-fixed: #211632;
+
+  --radius-default: 1rem;
+  --radius-lg: 2rem;
+  --radius-xl: 3rem;
+  --radius-full: 9999px;
+}
+
+* {
+  font-family: 'Noto Sans KR', 'Plus Jakarta Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, h4, h5, h6, .font-headline {
+  font-family: 'Plus Jakarta Sans', 'Noto Sans KR', sans-serif !important;
+}
+
+.phone-container {
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 10px #171717;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+.floating-mate {
+  animation: float 3s ease-in-out infinite;
+}
+
+.bubbly-shadow {
+  box-shadow: 0 8px 24px rgba(53, 103, 97, 0.06);
+}
+
+.bubbly-button {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 0 #1b4e4a;
+  transition: all 0.1s ease;
+}
+.bubbly-button:active {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 0px 0 #1b4e4a;
+  transform: translateY(2px);
+}
+
+.timetable-cell-active {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Eye-Comfort Premium Dark Mode Style Overrides */
+html.dark #app-screen,
+html.dark #nav-drawer,
+html.dark #login-gateway {
+  background-color: #121314 !important;
+  color: #cbd5e1 !important;
+}
+html.dark header {
+  background-color: rgba(18, 19, 20, 0.8) !important;
+  border-bottom-color: #2d3134 !important;
+}
+html.dark nav {
+  background-color: #121314 !important;
+  border-top-color: #2d3134 !important;
+}
+html.dark #planner-weekly-calendar {
+  background-color: #1a1c1e !important;
+  border-color: #2d3134 !important;
+}
+html.dark #planner-weekly-calendar button:not(.bg-primary) {
+  background-color: #121314 !important;
+  border-color: #25282a !important;
+  color: #94a3b8 !important;
+}
+html.dark #subject-cards-list > div,
+html.dark #concepts-list > div,
+html.dark #wrong-answers-list > div {
+  background-color: #1a1c1e !important;
+  border-color: #2d3134 !important;
+}
+html.dark #view-planner .col-span-7 {
+  background-color: #1a1c1e !important;
+  border-color: #2d3134 !important;
+}
+html.dark #timetable-grid {
+  background-color: #2d3134 !important;
+}
+html.dark .timetable-grid-cell:not(.timetable-cell-active) {
+  background-color: #121314 !important;
+  border-right-color: #25282a !important;
+}
+html.dark .timetable-grid-cell:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+html.dark #view-notes .bg-surface-container-lowest,
+html.dark #view-character .bg-surface-container-lowest,
+html.dark #view-calendar .bg-surface-container-lowest {
+  background-color: #1a1c1e !important;
+  border-color: #2d3134 !important;
+}
+html.dark #calendar-days-container button:not(.bg-primary):not(.bg-primary\/20) {
+  background-color: #121314 !important;
+  color: #cbd5e1 !important;
+}
+html.dark #calendar-days-container div {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  color: rgba(255, 255, 255, 0.15) !important;
+}
+html.dark div[id$="-modal"] > div,
+html.dark #calendar-note-modal > div,
+html.dark #profile-dropdown {
+  background-color: #1a1c1e !important;
+  border-color: #383c3e !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+}
+html.dark div[id$="-modal"] input,
+html.dark div[id$="-modal"] textarea,
+html.dark div[id$="-modal"] select,
+html.dark #calendar-note-modal textarea {
+  background-color: #121314 !important;
+  border-color: #383c3e !important;
+  color: #f1f5f9 !important;
+}
+html.dark .text-on-surface {
+  color: #f1f5f9 !important;
+}
+html.dark .text-on-surface-variant,
+html.dark [class*="text-on-surface-variant"] {
+  color: #94a3b8 !important;
+}
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+  color: #f1f5f9 !important;
+}
+html.dark .border-primary {
+  border-color: var(--primary-color, #356761) !important;
+}
+html.dark .bg-surface-container-low,
+html.dark .bg-surface-container-low\/40,
+html.dark .bg-surface-container-low\/60,
+html.dark .bg-surface-container-low\/80 {
+  background-color: #1a1c1e !important;
+  border-color: #2d3134 !important;
+}
+html.dark .bg-surface-container-high {
+  background-color: #222527 !important;
+  border-color: #2d3134 !important;
+}
+html.dark .bg-surface-container-lowest {
+  background-color: #121314 !important;
+  border-color: #2d3134 !important;
+}
+
+/* Theme sharp card corner option override */
+.theme-sharp .rounded-xl,
+.theme-sharp .rounded-2xl,
+.theme-sharp .rounded-3xl,
+.theme-sharp .rounded-lg {
+  border-radius: 0px !important;
+}
