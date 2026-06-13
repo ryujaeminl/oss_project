@@ -101,5 +101,5 @@ export const authOptions: AuthOptions = {
   pages: {
     signIn: "/",
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "woolini-dev-secret-2026",
 };

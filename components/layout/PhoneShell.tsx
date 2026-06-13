@@ -111,36 +111,24 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
   const showHeaderFooter = isLoggedIn && pathname !== "/";
 
   return (
-    <div className={
-      isMobileMode
-        ? "bg-surface min-h-screen w-full flex flex-col overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container"
-        : "bg-gradient-to-br from-slate-900 via-neutral-900 to-slate-950 min-h-screen flex items-center justify-center p-0 md:p-6 overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container"
-    }>
+    <div className="bg-surface overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container md:bg-gradient-to-br md:from-slate-900 md:via-neutral-900 md:to-slate-950 md:min-h-screen md:flex md:items-center md:justify-center md:p-0">
       {/* Android Phone Frame Shell Wrapper */}
-      <div className={
-        isMobileMode
-          ? "w-full min-h-screen bg-surface flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-          : "phone-container w-full max-w-[420px] aspect-[9/19.5] min-h-[720px] md:min-h-[840px] bg-neutral-950 rounded-[48px] overflow-hidden relative flex flex-col border-[4px] border-neutral-800/80"
-      }>
+      <div className="w-full min-h-screen bg-surface flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:phone-container md:max-w-[420px] md:aspect-[9/19.5] md:min-h-[840px] md:bg-neutral-950 md:rounded-[48px] md:border-[4px] md:border-neutral-800/80 md:overflow-hidden md:pt-0 md:pb-0">
         
         {/* Top Camera Punch Hole Notch */}
-        {!isMobileMode && (
-          <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-28 h-5.5 bg-black rounded-full z-[80] flex items-center justify-center pointer-events-none">
-            <div className="w-3 h-3 bg-neutral-900 rounded-full border border-neutral-800/50 ml-auto mr-4"></div>
-          </div>
-        )}
+        <div className="hidden md:flex absolute top-3.5 left-1/2 -translate-x-1/2 w-28 h-5.5 bg-black rounded-full z-[80] items-center justify-center pointer-events-none">
+          <div className="w-3 h-3 bg-neutral-900 rounded-full border border-neutral-800/50 ml-auto mr-4"></div>
+        </div>
 
         {/* Android Status Bar */}
-        {!isMobileMode && (
-          <div className="h-11 bg-[#6c5dd3]/10 dark:bg-black/20 flex items-center justify-between px-7 pt-2.5 z-50 text-white font-bold text-xs select-none pointer-events-none">
-            <span>{timeStr}</span>
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-sm font-bold">wifi</span>
-              <span className="material-symbols-outlined text-sm font-bold">signal_cellular_4_bar</span>
-              <span className="material-symbols-outlined text-sm font-bold">battery_full</span>
-            </div>
+        <div className="hidden md:flex h-11 bg-[#6c5dd3]/10 dark:bg-black/20 items-center justify-between px-7 pt-2.5 z-50 text-white font-bold text-xs select-none pointer-events-none">
+          <span>{timeStr}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm font-bold">wifi</span>
+            <span className="material-symbols-outlined text-sm font-bold">signal_cellular_4_bar</span>
+            <span className="material-symbols-outlined text-sm font-bold">battery_full</span>
           </div>
-        )}
+        </div>
 
         {/* App Screen Inside Shell */}
         <div
@@ -173,9 +161,7 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
           {showHeaderFooter && <BottomNav />}
 
           {/* Bottom Navigation Gesture Bar */}
-          {!isMobileMode && (
-            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-neutral-600/40 rounded-full z-[80] pointer-events-none select-none"></div>
-          )}
+          <div className="hidden md:block absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-neutral-600/40 rounded-full z-[80] pointer-events-none select-none"></div>
         </div>
       </div>
 
