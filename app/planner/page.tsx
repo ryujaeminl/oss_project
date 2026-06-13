@@ -549,7 +549,8 @@ export default function PlannerPage() {
     return null;
   };
 
-  const handleCellMouseDown = (hour: number, part: number) => {
+  const handleCellMouseDown = (e: React.MouseEvent, hour: number, part: number) => {
+    e.preventDefault();
     const key = `${currentPlannerDate}_${hour}_${part}`;
     const erasing = !!timetableDrawings[key];
     setIsErasing(erasing);
@@ -918,7 +919,7 @@ export default function PlannerPage() {
           </div>
 
           <div
-            className="flex-1 overflow-y-auto pr-0.5 custom-scrollbar space-y-1 pb-16"
+            className="flex-1 overflow-y-auto pr-0.5 custom-scrollbar space-y-1 pb-16 select-none"
             id="timetable-scroller"
           >
             {Array.from({ length: 24 }).map((_, hour) => {
@@ -1045,7 +1046,7 @@ export default function PlannerPage() {
                       return (
                         <div
                           key={part}
-                          onMouseDown={() => handleCellMouseDown(hour, part)}
+                          onMouseDown={(e) => handleCellMouseDown(e, hour, part)}
                           onMouseEnter={() => handleCellMouseEnter(hour, part)}
                           onTouchStart={(e) => handleCellTouchStart(e, hour, part)}
                           onTouchMove={handleCellTouchMove}
