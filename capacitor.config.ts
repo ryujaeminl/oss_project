@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
     // 2. iOS 시뮬레이터에서 실행할 경우: "http://localhost:3000"
     // 3. 실제 모바일 기기(Wi-Fi 연결): "http://PC의_IP주소:3000" (예: http://192.168.0.5:3000)
     // 4. 배포 시: 실제 배포된 URL (예: https://woolini.vercel.app)
-    // url: "http://localhost:3000",
+    url: "https://oss-project-seven.vercel.app",
     cleartext: true,
   },
 };

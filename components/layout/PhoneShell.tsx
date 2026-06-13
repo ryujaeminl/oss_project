@@ -24,6 +24,19 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
   const [editGoal, setEditGoal] = useState("");
   const [editApiKey, setEditApiKey] = useState("");
 
+  const [isMobileMode, setIsMobileMode] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const isCapNative = typeof window !== "undefined" && (window as any).Capacitor?.isNative;
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobileMode(!!isCapNative || isSmallScreen);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // Update android status bar clock
   useEffect(() => {
     const updateClock = () => {
@@ -98,24 +111,36 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
   const showHeaderFooter = isLoggedIn && pathname !== "/";
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 via-neutral-900 to-slate-950 min-h-screen flex items-center justify-center p-0 md:p-6 overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+    <div className={
+      isMobileMode
+        ? "bg-surface min-h-screen w-full flex flex-col overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container"
+        : "bg-gradient-to-br from-slate-900 via-neutral-900 to-slate-950 min-h-screen flex items-center justify-center p-0 md:p-6 overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container"
+    }>
       {/* Android Phone Frame Shell Wrapper */}
-      <div className="phone-container w-full max-w-[420px] aspect-[9/19.5] min-h-[720px] md:min-h-[840px] bg-neutral-950 rounded-[48px] overflow-hidden relative flex flex-col border-[4px] border-neutral-800/80">
+      <div className={
+        isMobileMode
+          ? "w-full min-h-screen bg-surface flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+          : "phone-container w-full max-w-[420px] aspect-[9/19.5] min-h-[720px] md:min-h-[840px] bg-neutral-950 rounded-[48px] overflow-hidden relative flex flex-col border-[4px] border-neutral-800/80"
+      }>
         
         {/* Top Camera Punch Hole Notch */}
-        <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-28 h-5.5 bg-black rounded-full z-[80] flex items-center justify-center pointer-events-none">
-          <div className="w-3 h-3 bg-neutral-900 rounded-full border border-neutral-800/50 ml-auto mr-4"></div>
-        </div>
+        {!isMobileMode && (
+          <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-28 h-5.5 bg-black rounded-full z-[80] flex items-center justify-center pointer-events-none">
+            <div className="w-3 h-3 bg-neutral-900 rounded-full border border-neutral-800/50 ml-auto mr-4"></div>
+          </div>
+        )}
 
         {/* Android Status Bar */}
-        <div className="h-11 bg-[#6c5dd3]/10 dark:bg-black/20 flex items-center justify-between px-7 pt-2.5 z-50 text-white font-bold text-xs select-none pointer-events-none">
-          <span>{timeStr}</span>
-          <div className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-sm font-bold">wifi</span>
-            <span className="material-symbols-outlined text-sm font-bold">signal_cellular_4_bar</span>
-            <span className="material-symbols-outlined text-sm font-bold">battery_full</span>
+        {!isMobileMode && (
+          <div className="h-11 bg-[#6c5dd3]/10 dark:bg-black/20 flex items-center justify-between px-7 pt-2.5 z-50 text-white font-bold text-xs select-none pointer-events-none">
+            <span>{timeStr}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm font-bold">wifi</span>
+              <span className="material-symbols-outlined text-sm font-bold">signal_cellular_4_bar</span>
+              <span className="material-symbols-outlined text-sm font-bold">battery_full</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* App Screen Inside Shell */}
         <div
@@ -148,7 +173,9 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
           {showHeaderFooter && <BottomNav />}
 
           {/* Bottom Navigation Gesture Bar */}
-          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-neutral-600/40 rounded-full z-[80] pointer-events-none select-none"></div>
+          {!isMobileMode && (
+            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-neutral-600/40 rounded-full z-[80] pointer-events-none select-none"></div>
+          )}
         </div>
       </div>
 

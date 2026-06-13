@@ -133,13 +133,17 @@ export default function PlannerPage() {
     }
   }, [currentPlannerDate, tasks, setNotifications]);
 
-  // Stop stopwatch on mouseUp globally
+  // Stop drawing on mouseUp / touchend globally
   useEffect(() => {
-    const handleMouseUp = () => {
+    const handleRelease = () => {
       setIsDrawing(false);
     };
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => window.removeEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mouseup", handleRelease);
+    window.addEventListener("touchend", handleRelease);
+    return () => {
+      window.removeEventListener("mouseup", handleRelease);
+      window.removeEventListener("touchend", handleRelease);
+    };
   }, []);
 
   const getActiveMascotUrl = () => {
@@ -557,6 +561,37 @@ export default function PlannerPage() {
     if (isDrawing) {
       colorCell(hour, part, isErasing);
     }
+  };
+
+  const handleCellTouchStart = (e: React.TouchEvent, hour: number, part: number) => {
+    if (e.cancelable) e.preventDefault();
+    const key = `${currentPlannerDate}_${hour}_${part}`;
+    const erasing = !!timetableDrawings[key];
+    setIsErasing(erasing);
+    setIsDrawing(true);
+    colorCell(hour, part, erasing);
+  };
+
+  const handleCellTouchMove = (e: React.TouchEvent) => {
+    if (!isDrawing) return;
+    if (e.cancelable) e.preventDefault();
+    
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+    
+    const hourAttr = element.getAttribute("data-hour");
+    const partAttr = element.getAttribute("data-part");
+    
+    if (hourAttr !== null && partAttr !== null) {
+      const h = parseInt(hourAttr, 10);
+      const p = parseInt(partAttr, 10);
+      colorCell(h, p, isErasing);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDrawing(false);
   };
 
   const colorCell = (hour: number, part: number, erase: boolean) => {
@@ -1012,6 +1047,11 @@ export default function PlannerPage() {
                           key={part}
                           onMouseDown={() => handleCellMouseDown(hour, part)}
                           onMouseEnter={() => handleCellMouseEnter(hour, part)}
+                          onTouchStart={(e) => handleCellTouchStart(e, hour, part)}
+                          onTouchMove={handleCellTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          data-hour={hour}
+                          data-part={part}
                           className={`bg-white dark:bg-neutral-900 hover:bg-primary-container/20 transition-colors cursor-pointer border-r border-neutral-100 dark:border-neutral-800/30 last:border-0 timetable-grid-cell ${
                             finalColor ? "timetable-cell-active" : ""
                           }`}
