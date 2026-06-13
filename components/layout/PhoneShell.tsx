@@ -111,17 +111,17 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
   const showHeaderFooter = isLoggedIn && pathname !== "/";
 
   return (
-    <div className="bg-surface overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container md:bg-gradient-to-br md:from-slate-900 md:via-neutral-900 md:to-slate-950 md:min-h-screen md:flex md:items-center md:justify-center md:p-0">
+    <div className="bg-surface overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container min-[700px]:bg-gradient-to-br min-[700px]:from-slate-900 min-[700px]:via-neutral-900 min-[700px]:to-slate-950 min-[700px]:min-h-screen min-[700px]:flex min-[700px]:items-center min-[700px]:justify-center min-[700px]:p-6">
       {/* Android Phone Frame Shell Wrapper */}
-      <div className="w-full min-h-screen bg-surface flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:phone-container md:max-w-[420px] md:aspect-[9/19.5] md:min-h-[840px] md:bg-neutral-950 md:rounded-[48px] md:border-[4px] md:border-neutral-800/80 md:overflow-hidden md:pt-0 md:pb-0">
+      <div className="w-full min-h-screen bg-surface flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] min-[700px]:w-auto min-[700px]:min-h-0 min-[700px]:min-w-0 min-[700px]:phone-container min-[700px]:max-w-[420px] min-[700px]:aspect-[9/19.5] min-[700px]:min-h-[840px] min-[700px]:bg-neutral-950 min-[700px]:rounded-[48px] min-[700px]:border-[4px] min-[700px]:border-neutral-800/80 min-[700px]:overflow-hidden min-[700px]:pt-0 min-[700px]:pb-0">
         
         {/* Top Camera Punch Hole Notch */}
-        <div className="hidden md:flex absolute top-3.5 left-1/2 -translate-x-1/2 w-28 h-5.5 bg-black rounded-full z-[80] items-center justify-center pointer-events-none">
+        <div className="hidden min-[700px]:flex absolute top-3.5 left-1/2 -translate-x-1/2 w-28 h-5.5 bg-black rounded-full z-[80] items-center justify-center pointer-events-none">
           <div className="w-3 h-3 bg-neutral-900 rounded-full border border-neutral-800/50 ml-auto mr-4"></div>
         </div>
 
         {/* Android Status Bar */}
-        <div className="hidden md:flex h-11 bg-[#6c5dd3]/10 dark:bg-black/20 items-center justify-between px-7 pt-2.5 z-50 text-white font-bold text-xs select-none pointer-events-none">
+        <div className="hidden min-[700px]:flex h-11 bg-[#6c5dd3]/10 dark:bg-black/20 items-center justify-between px-7 pt-2.5 z-50 text-white font-bold text-xs select-none pointer-events-none">
           <span>{timeStr}</span>
           <div className="flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm font-bold">wifi</span>
@@ -161,7 +161,7 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
           {showHeaderFooter && <BottomNav />}
 
           {/* Bottom Navigation Gesture Bar */}
-          <div className="hidden md:block absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-neutral-600/40 rounded-full z-[80] pointer-events-none select-none"></div>
+          <div className="hidden min-[700px]:block absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-neutral-600/40 rounded-full z-[80] pointer-events-none select-none"></div>
         </div>
       </div>
 

@@ -292,7 +292,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const storedSettings = localStorage.getItem("sp_settings");
       if (storedSettings) {
         const parsed = JSON.parse(storedSettings);
-        setSettings((prev) => ({ ...prev, ...parsed }));
+        // Exclude username and avatarUrl — these must always come from server when authenticated
+        const { username: _u, avatarUrl: _a, ...localOnlySettings } = parsed;
+        setSettings((prev) => ({ ...prev, ...localOnlySettings }));
       }
 
       const storedTasks = localStorage.getItem("sp_tasks");

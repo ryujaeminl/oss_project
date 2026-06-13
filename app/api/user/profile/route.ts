@@ -17,7 +17,7 @@ export async function GET() {
 
     return NextResponse.json({
       id: user.id,
-      name: user.characterName || user.name || "학습자",
+      name: user.name || user.characterName || "학습자",
       email: user.email,
       image: user.characterImage || user.image || "",
       goalTime: user.goalTime !== undefined ? Number(user.goalTime) : 120,
