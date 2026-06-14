@@ -3,7 +3,9 @@
 
 
 import React, { useState, useRef, useEffect } from "react";
-import { useApp } from "@/lib/AppContext";
+import { useApp, type AppSettings } from "@/lib/AppContext";
+
+type MascotKey = AppSettings["activeMascot"];
 
 const MASCOT_IMAGES: Record<string, string> = {
   woolini:
@@ -12,14 +14,33 @@ const MASCOT_IMAGES: Record<string, string> = {
   "gom-i": "https://img.icons8.com/color/150/teddy-bear.png",
 };
 
+interface StudyPlanItem {
+  date: string;
+  title: string;
+  duration: string;
+  content: string;
+}
+
 interface ChatMessage {
   id: number;
   sender: "user" | "mascot";
   text: string;
+  proposedPlan?: StudyPlanItem[];
+  planStatus?: "pending" | "added" | "cancelled" | "modified";
 }
 
+interface ChatApiResponse {
+  reply?: string;
+  error?: string;
+  proposedPlan?: StudyPlanItem[];
+}
+
+type WindowWithWebkitAudio = Window & {
+  webkitAudioContext?: typeof AudioContext;
+};
+
 export default function CharacterPage() {
-  const { settings, updateSettings, addXP, mascotLevel, mascotXP, updateCharacter } = useApp();
+  const { settings, addXP, mascotLevel, mascotXP, updateCharacter, createTask } = useApp();
 
   const [customUrlInput, setCustomUrlInput] = useState(
     settings.customMascotUrl || ""
@@ -27,6 +48,12 @@ export default function CharacterPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatViewRef = useRef<HTMLDivElement>(null);
+  const messageIdRef = useRef(0);
+
+  const nextMessageId = () => {
+    messageIdRef.current += 1;
+    return messageIdRef.current;
+  };
 
   const activeMascot = settings.activeMascot || "woolini";
 
@@ -56,8 +83,10 @@ export default function CharacterPage() {
   const playStudyBell = () => {
     if (!settings.soundEnabled) return;
     try {
-      const audioCtx = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
+      const audioConstructor =
+        window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext;
+      if (!audioConstructor) return;
+      const audioCtx = new audioConstructor();
       const notes = [523.25, 659.25, 783.99];
       notes.forEach((freq, index) => {
         const osc = audioCtx.createOscillator();
@@ -97,11 +126,72 @@ export default function CharacterPage() {
     };
 
     const newMsg: ChatMessage = {
-      id: Date.now(),
+      id: nextMessageId(),
       sender: "mascot",
       text: voiceLines[activeMascot] || voiceLines.woolini,
     };
     setChatMessages((prev) => [...prev, newMsg]);
+  };
+
+  const handleAcceptPlan = async (messageId: number, plan: StudyPlanItem[]) => {
+    try {
+      for (const item of plan) {
+        if (!item || !item.title) continue;
+        await createTask(
+          item.title,
+          item.content || "",
+          null,
+          item.duration || "1시간",
+          null,
+          "#a5d8d1",
+          item.date
+        );
+      }
+      setChatMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, planStatus: "added" } : msg
+        )
+      );
+      const successMsg: ChatMessage = {
+        id: nextMessageId(),
+        sender: "mascot",
+        text: `추천 학습 계획 ${plan.length}개를 플래너에 성공적으로 등록했습니다! 화이팅이에요! 🐉✨`,
+      };
+      setChatMessages((prev) => [...prev, successMsg]);
+      playStudyBell();
+    } catch (error) {
+      console.error("Failed to add tasks:", error);
+      alert("플래너에 일정을 추가하는 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleEditPlan = (messageId: number) => {
+    setChatMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, planStatus: "modified" } : msg
+      )
+    );
+    const guidanceMsg: ChatMessage = {
+      id: nextMessageId(),
+      sender: "mascot",
+      text: "학습 계획을 어떻게 수정할까요? 아래 입력창에 수정하고 싶은 내용을 말씀해주세요! (예: '수학 공부 시간을 줄여줘', '일정을 내일로 옮겨줘')",
+    };
+    setChatMessages((prev) => [...prev, guidanceMsg]);
+    setChatInput("방금 추천해준 일정을 조금 줄여줘");
+  };
+
+  const handleCancelPlan = (messageId: number) => {
+    setChatMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, planStatus: "cancelled" } : msg
+      )
+    );
+    const cancelMsg: ChatMessage = {
+      id: nextMessageId(),
+      sender: "mascot",
+      text: "학습 계획 제안을 취소했습니다. 다른 도움이 필요하시면 언제든 말씀해주세요!",
+    };
+    setChatMessages((prev) => [...prev, cancelMsg]);
   };
 
   const handleSendChat = async () => {
@@ -109,7 +199,7 @@ export default function CharacterPage() {
     if (!text) return;
 
     const userMsg: ChatMessage = {
-      id: Date.now(),
+      id: nextMessageId(),
       sender: "user",
       text,
     };
@@ -121,7 +211,7 @@ export default function CharacterPage() {
       parts: [msg.text],
     }));
 
-    const typingId = Date.now() + 1;
+    const typingId = nextMessageId();
     try {
       const typingMsg: ChatMessage = {
         id: typingId,
@@ -136,7 +226,7 @@ export default function CharacterPage() {
         body: JSON.stringify({ message: text, history }),
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as ChatApiResponse;
       
       setChatMessages((prev) =>
         prev.filter((msg) => msg.id !== typingId)
@@ -144,9 +234,11 @@ export default function CharacterPage() {
 
       if (res.ok && data.reply) {
         const aiMsg: ChatMessage = {
-          id: Date.now() + 2,
+          id: nextMessageId(),
           sender: "mascot",
           text: data.reply,
+          proposedPlan: data.proposedPlan,
+          planStatus: data.proposedPlan ? "pending" : undefined,
         };
         setChatMessages((prev) => [...prev, aiMsg]);
         playStudyBell();
@@ -158,7 +250,7 @@ export default function CharacterPage() {
           custom: "정말 현명한 생각입니다. 지속 가능한 실천을 위해 1분 단위 상세 계획을 지켜봐요! ✨",
         };
         const aiMsg: ChatMessage = {
-          id: Date.now() + 2,
+          id: nextMessageId(),
           sender: "mascot",
           text: data.error || answers[activeMascot] || answers.woolini,
         };
@@ -177,7 +269,7 @@ export default function CharacterPage() {
         custom: "정말 현명한 생각입니다. 지속 가능한 실천을 위해 1분 단위 상세 계획을 지켜봐요! ✨",
       };
       const aiMsg: ChatMessage = {
-        id: Date.now() + 2,
+        id: nextMessageId(),
         sender: "mascot",
         text: answers[activeMascot] || answers.woolini,
       };
@@ -193,8 +285,8 @@ export default function CharacterPage() {
     }
   }, [chatMessages]);
 
-  const handleSelectMascot = (key: string) => {
-    const nameMap: Record<string, string> = {
+  const handleSelectMascot = (key: MascotKey) => {
+    const nameMap: Record<MascotKey, string> = {
       woolini: "울리니",
       "yang-i": "양양이",
       "gom-i": "곰곰이",
@@ -207,10 +299,10 @@ export default function CharacterPage() {
     else if (key === "gom-i") imageUrl = MASCOT_IMAGES["gom-i"];
     else if (key === "custom") imageUrl = settings.customMascotUrl || "";
 
-    updateCharacter(key as any, nameMap[key] || key, imageUrl);
+    updateCharacter(key, nameMap[key] || key, imageUrl);
 
     const newMsg: ChatMessage = {
-      id: Date.now(),
+      id: nextMessageId(),
       sender: "mascot",
       text: `파트너가 ${nameMap[key] || key}(으)로 교체되었습니다! 🐾`,
     };
@@ -225,7 +317,7 @@ export default function CharacterPage() {
     }
     updateCharacter("custom", "커스텀", url);
     const newMsg: ChatMessage = {
-      id: Date.now(),
+      id: nextMessageId(),
       sender: "mascot",
       text: "나만의 커스텀 캐릭터 이미지가 등록되었습니다! 🐾",
     };
@@ -243,7 +335,7 @@ export default function CharacterPage() {
         updateCharacter("custom", "커스텀", dataUrl);
         setCustomUrlInput(dataUrl);
         const newMsg: ChatMessage = {
-          id: Date.now(),
+          id: nextMessageId(),
           sender: "mascot",
           text: "나만의 커스텀 캐릭터 사진이 등록되었습니다! 🐾",
         };
@@ -255,7 +347,7 @@ export default function CharacterPage() {
 
   const xpPercent = Math.min((mascotXP / 1000) * 100, 100);
 
-  const mascotsList = [
+  const mascotsList: Array<{ key: MascotKey; label: string; src: string }> = [
     { key: "woolini", label: "울리니", src: MASCOT_IMAGES.woolini },
     { key: "yang-i", label: "양양이", src: MASCOT_IMAGES["yang-i"] },
     { key: "gom-i", label: "곰곰이", src: MASCOT_IMAGES["gom-i"] },
@@ -339,8 +431,68 @@ export default function CharacterPage() {
                       alt="Mascot"
                     />
                   </div>
-                  <div className="bg-secondary/10 text-on-secondary-container px-3 py-1.5 rounded-xl rounded-tl-none text-xs leading-normal max-w-[80%]">
-                    {msg.text}
+                  <div className="flex flex-col gap-2 max-w-[80%]">
+                    <div className="bg-secondary/10 text-on-secondary-container px-3 py-1.5 rounded-xl rounded-tl-none text-xs leading-normal w-full">
+                      {msg.text}
+                    </div>
+                    {msg.proposedPlan && msg.proposedPlan.length > 0 && (
+                      <div className="bg-surface-container-low border border-surface-variant/40 rounded-xl p-3 flex flex-col gap-2 bubbly-shadow mt-1 text-on-surface">
+                        <span className="text-[10px] font-bold text-primary flex items-center gap-1 select-none">
+                          <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                          💡 AI 추천 학습 계획
+                        </span>
+                        
+                        <div className="flex flex-col gap-1.5 max-h-[150px] overflow-y-auto pr-1">
+                          {msg.proposedPlan.map((item, idx) => (
+                            <div key={idx} className="bg-surface-container-highest/50 border border-surface-variant/25 rounded-lg p-2 flex flex-col gap-0.5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[9px] font-bold text-on-surface-variant">{item.date}</span>
+                                <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">{item.duration}</span>
+                              </div>
+                              <span className="text-xs font-bold text-on-surface">{item.title}</span>
+                              {item.content && (
+                                <span className="text-[9px] text-on-surface-variant/85 leading-normal">{item.content}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {msg.planStatus === "pending" && (
+                          <div className="flex gap-1.5 mt-1 pt-1.5 border-t border-surface-variant/10">
+                            <button
+                              onClick={() => handleAcceptPlan(msg.id, msg.proposedPlan!)}
+                              className="flex-1 py-1 bg-primary text-white text-[9px] font-bold rounded-lg active:scale-95 transition-all cursor-pointer text-center"
+                            >
+                              추가하기
+                            </button>
+                            <button
+                              onClick={() => handleEditPlan(msg.id)}
+                              className="flex-1 py-1 border border-primary text-primary hover:bg-primary/5 text-[9px] font-bold rounded-lg active:scale-95 transition-all cursor-pointer text-center"
+                            >
+                              수정하기
+                            </button>
+                            <button
+                              onClick={() => handleCancelPlan(msg.id)}
+                              className="py-1 px-2.5 bg-surface-container-highest text-on-surface-variant hover:bg-surface-container-high text-[9px] font-bold rounded-lg active:scale-95 transition-all cursor-pointer text-center"
+                            >
+                              취소하기
+                            </button>
+                          </div>
+                        )}
+
+                        {msg.planStatus === "added" && (
+                          <div className="text-center text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 py-1 rounded-lg mt-1 select-none border border-emerald-500/10">
+                            ✅ 플래너에 등록되었습니다!
+                          </div>
+                        )}
+
+                        {msg.planStatus === "cancelled" && (
+                          <div className="text-center text-[9px] font-bold text-on-surface-variant/60 bg-surface-container-high py-1 rounded-lg mt-1 select-none border border-surface-variant/10">
+                            ❌ 계획 등록이 취소되었습니다.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )

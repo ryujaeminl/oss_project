@@ -57,7 +57,7 @@ export const authOptions: AuthOptions = {
     async signIn({ user, account }) {
       if (account?.provider !== "credentials" && user.email) {
         // Find or create user for Social Logins
-        let dbUser = await findUserByEmail(user.email);
+        const dbUser = await findUserByEmail(user.email);
 
         if (!dbUser) {
           await createUser({
