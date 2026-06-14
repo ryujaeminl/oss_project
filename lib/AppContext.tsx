@@ -41,6 +41,7 @@ export interface RoomFurniture {
   itemId: string;
   x: number;
   y: number;
+  scale?: number;
 }
 
 export interface EquippedClothing {
@@ -68,6 +69,7 @@ export interface AppSettings {
   colorEasy: string;
   colorMedium: string;
   colorHard: string;
+  activeWallpaper?: string;
 }
 
 interface AppContextType {
@@ -101,6 +103,8 @@ interface AppContextType {
   setOwnedClothing: React.Dispatch<React.SetStateAction<string[]>>;
   equippedClothing: EquippedClothing;
   setEquippedClothing: React.Dispatch<React.SetStateAction<EquippedClothing>>;
+  ownedWallpapers: string[];
+  setOwnedWallpapers: React.Dispatch<React.SetStateAction<string[]>>;
   isLoggedIn: boolean;
   setIsLoggedIn: (loginState: boolean) => void;
   currentActiveTab: string;
@@ -141,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     colorEasy: "#FFFACD",
     colorMedium: "#87CEFA",
     colorHard: "#FA8072",
+    activeWallpaper: "wall-default",
   });
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -157,6 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [roomFurniture, setRoomFurniture] = useState<RoomFurniture[]>([]);
   const [ownedClothing, setOwnedClothing] = useState<string[]>([]);
   const [equippedClothing, setEquippedClothing] = useState<EquippedClothing>({});
+  const [ownedWallpapers, setOwnedWallpapers] = useState<string[]>(["wall-default"]);
 
   // Initialize dates
   useEffect(() => {
@@ -366,6 +372,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const storedEquippedClothing = localStorage.getItem("sp_equippedClothing");
       if (storedEquippedClothing) setEquippedClothing(JSON.parse(storedEquippedClothing));
 
+      const storedOwnedWallpapers = localStorage.getItem("sp_ownedWallpapers");
+      if (storedOwnedWallpapers) {
+        setOwnedWallpapers(JSON.parse(storedOwnedWallpapers));
+      } else {
+        setOwnedWallpapers(["wall-default"]);
+      }
+
       const loginState = localStorage.getItem("sp_logged_in");
       if (loginState === "true") setIsLoggedIn(true);
     } catch (e) {
@@ -428,6 +441,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window === "undefined") return;
     localStorage.setItem("sp_ownedFurniture", JSON.stringify(ownedFurniture));
   }, [ownedFurniture]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("sp_ownedWallpapers", JSON.stringify(ownedWallpapers));
+  }, [ownedWallpapers]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -896,6 +914,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setOwnedClothing,
         equippedClothing,
         setEquippedClothing,
+        ownedWallpapers,
+        setOwnedWallpapers,
         isLoggedIn,
         setIsLoggedIn,
         currentActiveTab,

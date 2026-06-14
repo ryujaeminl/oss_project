@@ -6,8 +6,25 @@ import { useApp, type AppSettings } from "@/lib/AppContext";
 type MascotKey = AppSettings["activeMascot"];
 type ClothingSlot = "head" | "face" | "neck" | "body" | "back" | "feet";
 type TabKey = "home" | "shop" | "storage" | "ask";
-type ShopKind = "furniture" | "clothing";
+type ShopKind = "furniture" | "clothing" | "wallpaper";
 type FurnitureKind = "bed" | "desk" | "sofa" | "lamp" | "shelf" | "rug";
+
+type WallpaperItem = {
+  id: string;
+  name: string;
+  price: number;
+  color: string;
+  previewColor: string;
+};
+
+const WALLPAPER_CATALOG: WallpaperItem[] = [
+  { id: "wall-default", name: "기본 세이지 벽지", price: 0, color: "#e8ffd9", previewColor: "#e8ffd9" },
+  { id: "wall-peach", name: "달콤 피치 벽지", price: 50, color: "#ffe5ec", previewColor: "#ffe5ec" },
+  { id: "wall-sky", name: "스카이 블루 벽지", price: 100, color: "#e0f2fe", previewColor: "#e0f2fe" },
+  { id: "wall-purple", name: "라벤더 드림 벽지", price: 150, color: "#f3e8ff", previewColor: "#f3e8ff" },
+  { id: "wall-lemon", name: "레몬 에이드 벽지", price: 120, color: "#fef9c3", previewColor: "#fef9c3" },
+  { id: "wall-dark", name: "시크 그레이 벽지", price: 200, color: "#374151", previewColor: "#374151" },
+];
 type ClothingKind = "beret" | "glasses" | "scarf" | "hoodie" | "bag" | "boots";
 
 type FurnitureItem = {
@@ -73,6 +90,7 @@ const SLOT_LABELS: Record<ClothingSlot, string> = {
 export default function CharacterPage() {
   const {
     settings,
+    updateSettings,
     mascotXP,
     mascotLevel,
     spendXP,
@@ -85,12 +103,16 @@ export default function CharacterPage() {
     setOwnedClothing,
     equippedClothing,
     setEquippedClothing,
+    ownedWallpapers,
+    setOwnedWallpapers,
   } = useApp();
 
   const [tab, setTab] = useState<TabKey>("home");
   const [shopKind, setShopKind] = useState<ShopKind>("furniture");
   const [editMode, setEditMode] = useState(false);
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
+  const [pettingEffect, setPettingEffect] = useState(false);
+  const [floatingText, setFloatingText] = useState<{ id: number; x: number; y: number }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -113,6 +135,40 @@ export default function CharacterPage() {
 
   const ownedFurnitureSet = useMemo(() => new Set(ownedFurniture), [ownedFurniture]);
   const ownedClothingSet = useMemo(() => new Set(ownedClothing), [ownedClothing]);
+  const ownedWallpapersSet = useMemo(() => new Set(ownedWallpapers), [ownedWallpapers]);
+
+  const updateFurnitureScale = (id: string, newScale: number) => {
+    setRoomFurniture((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, scale: Math.max(0.5, Math.min(2.0, parseFloat(newScale.toFixed(1)))) } : item
+      )
+    );
+  };
+
+  const buyWallpaper = (item: WallpaperItem) => {
+    if (ownedWallpapersSet.has(item.id)) return;
+    if (item.price > 0 && !spendXP(item.price)) {
+      alert("XP가 부족해요. 공부를 완료해서 XP를 모아주세요.");
+      return;
+    }
+    setOwnedWallpapers((prev) => [...prev, item.id]);
+    updateSettings({ activeWallpaper: item.id });
+  };
+
+  const handlePetCharacter = (e: React.MouseEvent<HTMLDivElement>) => {
+    addXP(3);
+    setPettingEffect(true);
+    setTimeout(() => setPettingEffect(false), 200);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newId = Date.now();
+    setFloatingText((prev) => [...prev, { id: newId, x, y }]);
+    setTimeout(() => {
+      setFloatingText((prev) => prev.filter((item) => item.id !== newId));
+    }, 1000);
+  };
 
   const getFurniture = (id: string) => FURNITURE_CATALOG.find((item) => item.id === id);
   const getClothing = (id?: string) => CLOTHING_CATALOG.find((item) => item.id === id);
@@ -214,7 +270,13 @@ export default function CharacterPage() {
   };
 
   const removeFurniture = (id: string) => {
-    setRoomFurniture((prev) => prev.filter((item) => item.id !== id));
+    setRoomFurniture((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (next.length === 0) {
+        setEditMode(false);
+      }
+      return next;
+    });
     if (selectedFurniture === id) setSelectedFurniture(null);
   };
 
@@ -276,7 +338,7 @@ export default function CharacterPage() {
         onPointerUp={stopFurnitureDrag}
         onPointerCancel={stopFurnitureDrag}
       >
-        <RoomBackground />
+        <RoomBackground wallpaperId={settings.activeWallpaper} />
 
         <div className="absolute left-5 top-7 z-30 rounded-full bg-white/95 px-4 py-2 text-xs font-extrabold text-[#3f6b31] shadow-md">
           ♥ 포근한 기분
@@ -303,8 +365,8 @@ export default function CharacterPage() {
               style={{
                 left: `${placed.x}%`,
                 top: `${placed.y}%`,
-                width: item.width,
-                height: item.height,
+                width: item.width * (placed.scale || 1),
+                height: item.height * (placed.scale || 1),
               }}
               aria-label={`${item.name} 이동`}
             >
@@ -313,7 +375,12 @@ export default function CharacterPage() {
           );
         })}
 
-        <div className="absolute left-1/2 top-[44%] z-20 h-[310px] w-[260px] -translate-x-1/2">
+        <div
+          onClick={handlePetCharacter}
+          className={`absolute left-1/2 top-[44%] z-20 h-[310px] w-[260px] -translate-x-1/2 cursor-pointer transition-all duration-200 select-none ${
+            pettingEffect ? "scale-90" : "hover:scale-[1.03] active:scale-95"
+          }`}
+        >
           <div className="absolute left-1/2 top-[61%] h-20 w-40 -translate-x-1/2 rounded-[50%] bg-[#5b7348]/15 blur-md" />
           <img
             src={mascotUrl}
@@ -324,20 +391,33 @@ export default function CharacterPage() {
           {equippedItems.map((item) => (
             <ClothingLayer key={item.id} item={item} />
           ))}
+
+          {/* Floating effects */}
+          {floatingText.map((t) => (
+            <span
+              key={t.id}
+              className="absolute animate-float-up pointer-events-none text-xs font-black text-[#3f6b31] bg-white/90 px-2 py-0.5 rounded-full shadow-md whitespace-nowrap"
+              style={{ left: t.x, top: t.y }}
+            >
+              +3 XP ♥
+            </span>
+          ))}
         </div>
 
-        <div className="absolute bottom-24 left-5 right-5 z-40 flex items-center justify-between">
+        <div className="absolute bottom-24 left-5 right-5 z-40 flex items-center justify-between pointer-events-none">
+          <div className="rounded-full bg-white/95 px-4 py-2.5 text-[10px] font-black text-[#3f6b31] shadow-md border border-[#d8e7d1]/80 select-none animate-pulse">
+            👉 울리니를 터치해 쓰다듬어주세요! (+3XP)
+          </div>
           <button
             type="button"
-            onClick={() => addXP(3)}
-            className="rounded-full bg-white/95 px-4 py-2 text-xs font-extrabold text-[#3f6b31] shadow-md"
-          >
-            쓰다듬기 +3XP
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditMode((prev) => !prev)}
-            className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-xl transition ${
+            onClick={() => {
+              if (roomFurniture.length === 0) {
+                alert("배치된 가구가 없습니다. 먼저 보관함이나 상점에서 가구를 배치해주세요!");
+                return;
+              }
+              setEditMode((prev) => !prev);
+            }}
+            className={`pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full text-white shadow-xl transition ${
               editMode ? "bg-[#ba1a1a]" : "bg-[#3f6b31]"
             }`}
             aria-label="방 편집"
@@ -347,53 +427,109 @@ export default function CharacterPage() {
         </div>
 
         {editMode && selectedFurniture && (
-          <button
-            type="button"
-            onClick={() => removeFurniture(selectedFurniture)}
-            className="absolute bottom-40 left-1/2 z-40 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-error shadow-lg"
-          >
-            선택한 가구 치우기
-          </button>
+          <div className="absolute bottom-40 left-1/2 z-40 -translate-x-1/2 flex flex-col items-center gap-2 select-none">
+            <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-lg border border-[#d8e7d1]">
+              <button
+                type="button"
+                onClick={() => {
+                  const placed = roomFurniture.find((f) => f.id === selectedFurniture);
+                  if (placed) {
+                    const currentScale = placed.scale || 1;
+                    updateFurnitureScale(selectedFurniture, currentScale - 0.1);
+                  }
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#edf8e5] text-[#3f6b31] font-bold text-lg active:scale-95 cursor-pointer"
+              >
+                -
+              </button>
+              <span className="text-xs font-extrabold text-[#3f6b31] w-12 text-center">
+                {Math.round((roomFurniture.find((f) => f.id === selectedFurniture)?.scale || 1) * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const placed = roomFurniture.find((f) => f.id === selectedFurniture);
+                  if (placed) {
+                    const currentScale = placed.scale || 1;
+                    updateFurnitureScale(selectedFurniture, currentScale + 0.1);
+                  }
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#edf8e5] text-[#3f6b31] font-bold text-lg active:scale-95 cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => removeFurniture(selectedFurniture)}
+              className="rounded-full bg-white px-4 py-2 text-xs font-extrabold text-error shadow-lg border border-red-100 cursor-pointer hover:bg-red-50 transition-colors"
+            >
+              선택한 가구 치우기
+            </button>
+          </div>
         )}
 
         {tab === "shop" && (
           <Panel title="상점" onClose={() => setTab("home")}>
             <div className="mb-3 flex rounded-full bg-[#edf8e5] p-1">
               <SegmentButton active={shopKind === "furniture"} onClick={() => setShopKind("furniture")}>
-                가구 6종
+                가구
               </SegmentButton>
               <SegmentButton active={shopKind === "clothing"} onClick={() => setShopKind("clothing")}>
-                옷 6종
+                의상
+              </SegmentButton>
+              <SegmentButton active={shopKind === "wallpaper"} onClick={() => setShopKind("wallpaper")}>
+                벽지
               </SegmentButton>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {shopKind === "furniture"
-                ? FURNITURE_CATALOG.map((item) => {
-                    const owned = ownedFurnitureSet.has(item.id);
-                    return (
-                      <ItemButton
-                        key={item.id}
-                        preview={<FurnitureModel item={item} compact />}
-                        name={item.name}
-                        meta={owned ? "보유중" : item.price > 0 ? `${item.price} XP` : "무료 구매"}
-                        disabled={owned}
-                        onClick={() => buyFurniture(item)}
-                      />
-                    );
-                  })
-                : CLOTHING_CATALOG.map((item) => {
-                    const owned = ownedClothingSet.has(item.id);
-                    return (
-                      <ItemButton
-                        key={item.id}
-                        preview={<ClothingPreview item={item} />}
-                        name={item.name}
-                        meta={owned ? `${SLOT_LABELS[item.slot]} 보유` : item.price > 0 ? `${item.price} XP` : "무료 구매"}
-                        disabled={owned}
-                        onClick={() => buyClothing(item)}
-                      />
-                    );
-                  })}
+              {shopKind === "furniture" &&
+                FURNITURE_CATALOG.map((item) => {
+                  const owned = ownedFurnitureSet.has(item.id);
+                  return (
+                    <ItemButton
+                      key={item.id}
+                      preview={<FurnitureModel item={item} compact />}
+                      name={item.name}
+                      meta={owned ? "보유중" : item.price > 0 ? `${item.price} XP` : "무료 구매"}
+                      disabled={owned}
+                      onClick={() => buyFurniture(item)}
+                    />
+                  );
+                })}
+              {shopKind === "clothing" &&
+                CLOTHING_CATALOG.map((item) => {
+                  const owned = ownedClothingSet.has(item.id);
+                  return (
+                    <ItemButton
+                      key={item.id}
+                      preview={<ClothingPreview item={item} />}
+                      name={item.name}
+                      meta={owned ? `${SLOT_LABELS[item.slot]} 보유` : item.price > 0 ? `${item.price} XP` : "무료 구매"}
+                      disabled={owned}
+                      onClick={() => buyClothing(item)}
+                    />
+                  );
+                })}
+              {shopKind === "wallpaper" &&
+                WALLPAPER_CATALOG.map((item) => {
+                  const owned = ownedWallpapersSet.has(item.id);
+                  return (
+                    <ItemButton
+                      key={item.id}
+                      preview={
+                        <div
+                          className="h-10 w-10 rounded-full border border-[#d8e7d1]/80 shadow-inner"
+                          style={{ backgroundColor: item.previewColor }}
+                        />
+                      }
+                      name={item.name}
+                      meta={owned ? "보유중" : item.price > 0 ? `${item.price} XP` : "무료 구매"}
+                      disabled={owned}
+                      onClick={() => buyWallpaper(item)}
+                    />
+                  );
+                })}
             </div>
           </Panel>
         )}
@@ -443,8 +579,44 @@ export default function CharacterPage() {
                 })
               )}
             </StorageSection>
+            <StorageSection title="벽지">
+              {ownedWallpapers.length === 0 ? (
+                <EmptyBox label="상점에서 벽지를 구매해 주세요." />
+              ) : (
+                ownedWallpapers.map((id) => {
+                  const item = WALLPAPER_CATALOG.find((w) => w.id === id);
+                  if (!item) return null;
+                  const isActive = settings.activeWallpaper === item.id;
+                  return (
+                    <ItemButton
+                      key={item.id}
+                      preview={
+                        <div
+                          className="h-10 w-10 rounded-full border border-[#d8e7d1]/80 shadow-inner"
+                          style={{ backgroundColor: item.previewColor }}
+                        />
+                      }
+                      name={item.name}
+                      meta={isActive ? "적용중" : "벽지 적용"}
+                      active={isActive}
+                      onClick={() => updateSettings({ activeWallpaper: item.id })}
+                    />
+                  );
+                })
+              )}
+            </StorageSection>
           </Panel>
         )}
+
+        <style>{`
+          @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            100% { transform: translateY(-70px) scale(1.18); opacity: 0; }
+          }
+          .animate-float-up {
+            animation: floatUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+        `}</style>
 
         {tab === "ask" && (
           <Panel title="질문하기" onClose={() => setTab("home")} tall>
@@ -511,10 +683,16 @@ export default function CharacterPage() {
   );
 }
 
-function RoomBackground() {
+function RoomBackground({ wallpaperId }: { wallpaperId?: string }) {
+  const wallpaper = WALLPAPER_CATALOG.find((w) => w.id === wallpaperId) || WALLPAPER_CATALOG[0];
   return (
     <>
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#e8ffd9_0%,#e8ffd9_52%,#fff7ef_52%,#fff7ef_100%)]" />
+      <div
+        className="absolute inset-0 transition-colors duration-300"
+        style={{
+          background: `linear-gradient(180deg, ${wallpaper.color} 0%, ${wallpaper.color} 52%, #fff7ef 52%, #fff7ef 100%)`,
+        }}
+      />
       <div className="absolute inset-x-0 top-[52%] h-px bg-[#eadfd5]" />
       <div className="absolute inset-x-0 bottom-20 grid h-[42%] grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
