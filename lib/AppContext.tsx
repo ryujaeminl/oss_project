@@ -36,6 +36,13 @@ export interface WrongAnswer {
   resolved: boolean;
 }
 
+export interface RoomFurniture {
+  id: string;
+  itemId: string;
+  x: number;
+  y: number;
+}
+
 export interface AppSettings {
   username: string;
   goalHours: string;
@@ -75,6 +82,11 @@ interface AppContextType {
   mascotXP: number;
   setMascotXP: React.Dispatch<React.SetStateAction<number>>;
   addXP: (amount: number) => void;
+  spendXP: (amount: number) => boolean;
+  ownedFurniture: string[];
+  setOwnedFurniture: React.Dispatch<React.SetStateAction<string[]>>;
+  roomFurniture: RoomFurniture[];
+  setRoomFurniture: React.Dispatch<React.SetStateAction<RoomFurniture[]>>;
   isLoggedIn: boolean;
   setIsLoggedIn: (loginState: boolean) => void;
   currentActiveTab: string;
@@ -127,6 +139,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<Array<{ id: number; text: string; date: string; read: boolean }>>([]);
   const [mascotLevel, setMascotLevel] = useState(1);
   const [mascotXP, setMascotXP] = useState(0);
+  const [ownedFurniture, setOwnedFurniture] = useState<string[]>([]);
+  const [roomFurniture, setRoomFurniture] = useState<RoomFurniture[]>([]);
 
   // Initialize dates
   useEffect(() => {
@@ -324,6 +338,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const storedNotifications = localStorage.getItem("sp_notifications");
       if (storedNotifications) setNotifications(JSON.parse(storedNotifications));
 
+      const storedOwnedFurniture = localStorage.getItem("sp_ownedFurniture");
+      if (storedOwnedFurniture) setOwnedFurniture(JSON.parse(storedOwnedFurniture));
+
+      const storedRoomFurniture = localStorage.getItem("sp_roomFurniture");
+      if (storedRoomFurniture) setRoomFurniture(JSON.parse(storedRoomFurniture));
+
       const loginState = localStorage.getItem("sp_logged_in");
       if (loginState === "true") setIsLoggedIn(true);
     } catch (e) {
@@ -381,6 +401,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window === "undefined" || !currentPlannerDate) return;
     localStorage.setItem("sp_notifications", JSON.stringify(notifications));
   }, [notifications, currentPlannerDate]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("sp_ownedFurniture", JSON.stringify(ownedFurniture));
+  }, [ownedFurniture]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("sp_roomFurniture", JSON.stringify(roomFurniture));
+  }, [roomFurniture]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -477,6 +507,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return newXP;
     });
+  };
+
+  const spendXP = (amount: number) => {
+    if (mascotXP < amount) return false;
+    const nextXP = mascotXP - amount;
+    setMascotXP(nextXP);
+
+    if (isLoggedIn) {
+      fetch("/api/character", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exp: nextXP }),
+      }).catch(console.error);
+    }
+
+    return true;
   };
 
   // Real Database Syncing Helper Methods
@@ -809,6 +855,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mascotXP,
         setMascotXP,
         addXP,
+        spendXP,
+        ownedFurniture,
+        setOwnedFurniture,
+        roomFurniture,
+        setRoomFurniture,
         isLoggedIn,
         setIsLoggedIn,
         currentActiveTab,

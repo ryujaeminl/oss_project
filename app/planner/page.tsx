@@ -21,7 +21,6 @@ export default function PlannerPage() {
     settings,
     timetableDrawings,
     setTimetableDrawings,
-    addXP,
     currentPlannerDate,
     setCurrentPlannerDate,
     setNotifications,
@@ -60,10 +59,6 @@ export default function PlannerPage() {
   // Drawing states
   const [isDrawing, setIsDrawing] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
-
-  // Floating mascot speech bubble state
-  const [speechBubble, setSpeechBubble] = useState("");
-  const [speechBubbleVisible, setSpeechBubbleVisible] = useState(false);
 
   // Setup interval for active stopwatch timer
   useEffect(() => {
@@ -473,46 +468,6 @@ export default function PlannerPage() {
       prev.map((t) => (t.id === id ? { ...t, timeSeconds: 0 } : t))
     );
     updateTaskTime(id, 0);
-  };
-
-  // Mascot woolini floating interaction
-  const handlePetFloatingMascot = () => {
-    const active = settings.activeMascot || "woolini";
-    const speechLines = {
-      woolini: "우와, 절 만져주셔서 집중도가 오르는 기분이에요! 🐉",
-      "yang-i": "보송보송한 양양이 털을 쓸어주셔서 공부가 더 잘될 거예요! 🐑",
-      "gom-i": "진득하게 묵묵히 앉아서 오늘도 목표를 달성해봅시다! 🐻",
-      custom: "새로운 힘이 솟아납니다! 힘내서 마스터해요! ✨",
-    };
-    setSpeechBubble(speechLines[active] || speechLines.woolini);
-    setSpeechBubbleVisible(true);
-    addXP(20);
-
-    // Audio beep simulation
-    if (settings.soundEnabled) {
-      try {
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const notes = [523.25, 659.25, 783.99];
-        notes.forEach((freq, index) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.12);
-          gain.gain.setValueAtTime(0.12, audioCtx.currentTime + index * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + index * 0.12 + 0.3);
-          osc.start(audioCtx.currentTime + index * 0.12);
-          osc.stop(audioCtx.currentTime + index * 0.12 + 0.4);
-        });
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    setTimeout(() => {
-      setSpeechBubbleVisible(false);
-    }, 3000);
   };
 
   // Timetable grid functions
@@ -1076,15 +1031,6 @@ export default function PlannerPage() {
           className="relative cursor-pointer"
           onClick={() => router.push("/character")}
         >
-          <div
-            className={`absolute bottom-full right-0 mb-2.5 bg-secondary text-white px-3 py-1.5 rounded-xl rounded-br-none text-[9px] font-bold transition-all duration-300 whitespace-nowrap shadow-md ${
-              speechBubbleVisible
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-1.5 pointer-events-none"
-            }`}
-          >
-            {speechBubble}
-          </div>
           <div
             className="w-12 h-12 rounded-full bg-white/40 dark:bg-black/40 backdrop-blur-md border border-white/50 p-1.5 bubbly-shadow flex items-center justify-center active:scale-90 transition-transform floating-mate"
             id="floating-mate-character"
