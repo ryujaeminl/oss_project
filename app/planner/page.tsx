@@ -59,6 +59,10 @@ export default function PlannerPage() {
   // Drawing states
   const [isDrawing, setIsDrawing] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
+  const [floatingMatePosition, setFloatingMatePosition] = useState({ x: 88, y: 86 });
+
+  const plannerRef = useRef<HTMLDivElement>(null);
+  const floatingMateDragRef = useRef({ dragging: false, moved: false });
 
   // Setup interval for active stopwatch timer
   useEffect(() => {
@@ -141,10 +145,60 @@ export default function PlannerPage() {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("sp_floatingMatePosition");
+      if (stored) setFloatingMatePosition(JSON.parse(stored));
+    } catch {
+      // ignore stored layout failures
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("sp_floatingMatePosition", JSON.stringify(floatingMatePosition));
+    } catch {
+      // ignore storage failures
+    }
+  }, [floatingMatePosition]);
+
   const getActiveMascotUrl = () => {
     const active = settings.activeMascot || "woolini";
     if (active === "custom") return settings.customMascotUrl || MASCOT_IMAGES.woolini;
     return MASCOT_IMAGES[active] || MASCOT_IMAGES.woolini;
+  };
+
+  const clampFloatingMate = (x: number, y: number) => ({
+    x: Math.min(92, Math.max(8, x)),
+    y: Math.min(88, Math.max(12, y)),
+  });
+
+  const updateFloatingMateFromPoint = (clientX: number, clientY: number) => {
+    const planner = plannerRef.current;
+    if (!planner) return;
+    const rect = planner.getBoundingClientRect();
+    const nextX = ((clientX - rect.left) / rect.width) * 100;
+    const nextY = ((clientY - rect.top) / rect.height) * 100;
+    setFloatingMatePosition(clampFloatingMate(nextX, nextY));
+  };
+
+  const handleFloatingMatePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    floatingMateDragRef.current = { dragging: true, moved: false };
+  };
+
+  const handleFloatingMatePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!floatingMateDragRef.current.dragging) return;
+    floatingMateDragRef.current.moved = true;
+    updateFloatingMateFromPoint(e.clientX, e.clientY);
+  };
+
+  const handleFloatingMatePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const wasMoved = floatingMateDragRef.current.moved;
+    floatingMateDragRef.current = { dragging: false, moved: false };
+    if (!wasMoved) router.push("/character");
   };
 
   // Helper date parsing/formatting
@@ -564,7 +618,7 @@ export default function PlannerPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col p-3.5 space-y-3 relative overflow-hidden">
+    <div ref={plannerRef} className="flex-1 flex flex-col p-3.5 space-y-3 relative overflow-hidden">
       
       {/* Top Banner D-Day Alert */}
       {settings.deadlineAlertsEnabled && dueTodayTasks.length > 0 && (
@@ -1026,10 +1080,21 @@ export default function PlannerPage() {
       </div>
 
       {/* Floating Mate mascot */}
-      <div className="absolute bottom-4 right-4 z-30 select-none">
-        <div
-          className="relative cursor-pointer"
-          onClick={() => router.push("/character")}
+      <div
+        className="absolute z-30 select-none"
+        style={{
+          left: `${floatingMatePosition.x}%`,
+          top: `${floatingMatePosition.y}%`,
+          transform: "translate(-50%, -50%)",
+        }}
+      >
+        <button
+          type="button"
+          className="relative cursor-grab touch-none active:cursor-grabbing"
+          onPointerDown={handleFloatingMatePointerDown}
+          onPointerMove={handleFloatingMatePointerMove}
+          onPointerUp={handleFloatingMatePointerUp}
+          aria-label="울리니 이동"
         >
           <div
             className="w-12 h-12 rounded-full bg-white/40 dark:bg-black/40 backdrop-blur-md border border-white/50 p-1.5 bubbly-shadow flex items-center justify-center active:scale-90 transition-transform floating-mate"
@@ -1041,7 +1106,7 @@ export default function PlannerPage() {
               alt="Mascot character"
             />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* ADD / EDIT SUBJECT MODAL DIALOG */}

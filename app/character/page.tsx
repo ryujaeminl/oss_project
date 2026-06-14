@@ -1,11 +1,31 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { useApp, type AppSettings, type RoomFurniture } from "@/lib/AppContext";
+import React, { useMemo, useRef, useState } from "react";
+import { useApp, type AppSettings } from "@/lib/AppContext";
 
 type MascotKey = AppSettings["activeMascot"];
-type MascotPose = "idle" | "happy" | "curious" | "sleepy" | "study" | "dragging";
-type FurnitureId = "studyDesk" | "napBed" | "bookShelf" | "lamp" | "sofa";
+type ClothingSlot = "head" | "neck" | "body" | "hand";
+type TabKey = "home" | "shop" | "storage";
+
+type FurnitureItem = {
+  id: string;
+  name: string;
+  price: number;
+  emoji: string;
+  width: number;
+  height: number;
+  defaultX: number;
+  defaultY: number;
+};
+
+type ClothingItem = {
+  id: string;
+  name: string;
+  price: number;
+  slot: ClothingSlot;
+  emoji: string;
+  className: string;
+};
 
 const MASCOT_IMAGES: Record<MascotKey, string> = {
   woolini:
@@ -15,886 +35,478 @@ const MASCOT_IMAGES: Record<MascotKey, string> = {
   custom: "https://img.icons8.com/color/150/user.png",
 };
 
-interface StudyPlanItem {
-  date: string;
-  title: string;
-  duration: string;
-  content: string;
-}
-
-interface ChatMessage {
-  id: number;
-  sender: "user" | "mascot";
-  text: string;
-  proposedPlan?: StudyPlanItem[];
-  planStatus?: "pending" | "added" | "cancelled" | "modified";
-}
-
-interface ChatApiResponse {
-  reply?: string;
-  error?: string;
-  proposedPlan?: StudyPlanItem[];
-}
-
-type StagePosition = {
-  x: number;
-  y: number;
-};
-
-type FurnitureItem = {
-  id: FurnitureId;
-  name: string;
-  price: number;
-  icon: string;
-  usePose: MascotPose;
-};
-
-type WindowWithWebkitAudio = Window & {
-  webkitAudioContext?: typeof AudioContext;
-};
-
-const MASCOT_NAMES: Record<MascotKey, string> = {
-  woolini: "울리니",
-  "yang-i": "양양이",
-  "gom-i": "곰곰이",
-  custom: "커스텀",
-};
-
-const POSE_LABELS: Record<MascotPose, string> = {
-  idle: "기분: 편안함",
-  happy: "기분: 신남",
-  curious: "기분: 호기심",
-  sleepy: "기분: 졸림",
-  study: "기분: 집중",
-  dragging: "기분: 이동 중",
-};
-
 const FURNITURE_CATALOG: FurnitureItem[] = [
-  { id: "studyDesk", name: "공부 책상", price: 120, icon: "table_restaurant", usePose: "study" },
-  { id: "napBed", name: "낮잠 침대", price: 180, icon: "bed", usePose: "sleepy" },
-  { id: "bookShelf", name: "책장", price: 150, icon: "shelves", usePose: "curious" },
-  { id: "lamp", name: "스탠드", price: 90, icon: "emoji_objects", usePose: "study" },
-  { id: "sofa", name: "휴식 소파", price: 220, icon: "chair", usePose: "idle" },
+  { id: "soft-bed", name: "말랑 침대", price: 0, emoji: "🛏️", width: 92, height: 70, defaultX: 74, defaultY: 66 },
+  { id: "round-table", name: "동글 테이블", price: 0, emoji: "🪑", width: 70, height: 64, defaultX: 27, defaultY: 68 },
+  { id: "study-desk", name: "공부 책상", price: 0, emoji: "📚", width: 86, height: 66, defaultX: 23, defaultY: 45 },
+  { id: "mood-lamp", name: "새싹 램프", price: 0, emoji: "💡", width: 50, height: 74, defaultX: 17, defaultY: 74 },
+  { id: "mini-sofa", name: "폭신 소파", price: 0, emoji: "🛋️", width: 92, height: 62, defaultX: 74, defaultY: 47 },
+  { id: "plant-friend", name: "화분 친구", price: 0, emoji: "🪴", width: 52, height: 70, defaultX: 18, defaultY: 78 },
 ];
+
+const CLOTHING_CATALOG: ClothingItem[] = [
+  { id: "leaf-hat", name: "잎사귀 모자", price: 0, slot: "head", emoji: "🌿", className: "left-1/2 top-[2%] -translate-x-1/2 text-4xl" },
+  { id: "yellow-cap", name: "노랑 모자", price: 0, slot: "head", emoji: "🧢", className: "left-1/2 top-[3%] -translate-x-1/2 text-4xl" },
+  { id: "pink-scarf", name: "복숭아 머플러", price: 0, slot: "neck", emoji: "🧣", className: "left-1/2 top-[43%] -translate-x-1/2 text-3xl" },
+  { id: "green-vest", name: "초록 조끼", price: 0, slot: "body", emoji: "🦺", className: "left-1/2 top-[53%] -translate-x-1/2 text-4xl" },
+  { id: "star-bag", name: "별 가방", price: 0, slot: "hand", emoji: "⭐", className: "right-[13%] top-[50%] text-3xl" },
+  { id: "pencil-wand", name: "연필 지팡이", price: 0, slot: "hand", emoji: "✏️", className: "left-[14%] top-[51%] -rotate-45 text-3xl" },
+];
+
+const SLOT_LABELS: Record<ClothingSlot, string> = {
+  head: "머리",
+  neck: "목",
+  body: "몸",
+  hand: "손",
+};
 
 export default function CharacterPage() {
   const {
     settings,
-    addXP,
-    spendXP,
-    mascotLevel,
     mascotXP,
+    mascotLevel,
+    spendXP,
+    addXP,
     ownedFurniture,
     setOwnedFurniture,
     roomFurniture,
     setRoomFurniture,
-    updateCharacter,
-    createTask,
+    ownedClothing,
+    setOwnedClothing,
+    equippedClothing,
+    setEquippedClothing,
   } = useApp();
 
-  const [customUrlInput, setCustomUrlInput] = useState(settings.customMascotUrl || "");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [mascotPose, setMascotPose] = useState<MascotPose>("idle");
-  const [stagePosition, setStagePosition] = useState<StagePosition>({ x: 50, y: 54 });
-  const [stageSpeech, setStageSpeech] = useState("");
-  const [affection, setAffection] = useState(35);
-  const [energy, setEnergy] = useState(72);
-  const [sparkleSeed, setSparkleSeed] = useState(0);
-  const [isFurnitureModalOpen, setIsFurnitureModalOpen] = useState(false);
-  const [placementDraft, setPlacementDraft] = useState<RoomFurniture[]>([]);
-  const [selectedFurnitureId, setSelectedFurnitureId] = useState<FurnitureId | null>(null);
-
-  const chatViewRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const messageIdRef = useRef(0);
-  const dragStateRef = useRef({
-    dragging: false,
-    moved: false,
-  });
+  const [tab, setTab] = useState<TabKey>("home");
+  const [shopKind, setShopKind] = useState<"furniture" | "clothing">("furniture");
+  const [editMode, setEditMode] = useState(false);
+  const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
+  const roomRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ id: string | null }>({ id: null });
 
   const activeMascot = settings.activeMascot || "woolini";
-  const xpPercent = Math.min((mascotXP / 1000) * 100, 100);
+  const mascotUrl =
+    activeMascot === "custom"
+      ? settings.customMascotUrl || MASCOT_IMAGES.custom
+      : MASCOT_IMAGES[activeMascot] || MASCOT_IMAGES.woolini;
 
-  const nextMessageId = () => {
-    messageIdRef.current += 1;
-    return messageIdRef.current;
+  const ownedFurnitureSet = useMemo(() => new Set(ownedFurniture), [ownedFurniture]);
+  const ownedClothingSet = useMemo(() => new Set(ownedClothing), [ownedClothing]);
+
+  const clampPosition = (x: number, y: number) => ({
+    x: Math.min(90, Math.max(10, x)),
+    y: Math.min(84, Math.max(24, y)),
+  });
+
+  const getFurniture = (id: string) => FURNITURE_CATALOG.find((item) => item.id === id);
+  const getClothing = (id?: string) => CLOTHING_CATALOG.find((item) => item.id === id);
+
+  const pointToRoomPosition = (clientX: number, clientY: number) => {
+    const room = roomRef.current;
+    if (!room) return { x: 50, y: 58 };
+    const rect = room.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    return clampPosition(x, y);
   };
 
-  const getActiveMascotUrl = () => {
-    if (activeMascot === "custom") {
-      return settings.customMascotUrl || MASCOT_IMAGES.custom;
+  const updateFurniturePosition = (id: string, x: number, y: number) => {
+    setRoomFurniture((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, x, y } : item))
+    );
+  };
+
+  const handleFurniturePointerDown = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    furnitureId: string
+  ) => {
+    if (!editMode) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current.id = furnitureId;
+    setSelectedFurniture(furnitureId);
+  };
+
+  const handleRoomPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const draggingId = dragRef.current.id;
+    if (!draggingId) return;
+    const { x, y } = pointToRoomPosition(e.clientX, e.clientY);
+    updateFurniturePosition(draggingId, x, y);
+  };
+
+  const stopFurnitureDrag = () => {
+    dragRef.current.id = null;
+  };
+
+  const buyFurniture = (item: FurnitureItem) => {
+    if (ownedFurnitureSet.has(item.id)) return;
+    if (item.price > 0 && !spendXP(item.price)) {
+      alert("XP가 부족해요. 공부를 완료해서 XP를 모아주세요.");
+      return;
     }
-    return MASCOT_IMAGES[activeMascot] || MASCOT_IMAGES.woolini;
-  };
-
-  const addMascotMessage = (text: string) => {
-    setChatMessages((prev) => [
+    setOwnedFurniture((prev) => [...prev, item.id]);
+    setRoomFurniture((prev) => [
       ...prev,
       {
-        id: nextMessageId(),
-        sender: "mascot",
-        text,
+        id: `${item.id}-${Date.now()}`,
+        itemId: item.id,
+        x: item.defaultX,
+        y: item.defaultY,
       },
     ]);
   };
 
-  const clampPosition = (x: number, y: number): StagePosition => ({
-    x: Math.min(88, Math.max(12, x)),
-    y: Math.min(76, Math.max(26, y)),
-  });
-
-  const getFurnitureItem = (itemId: string) =>
-    FURNITURE_CATALOG.find((item) => item.id === itemId);
-
-  const playStudyBell = () => {
-    if (!settings.soundEnabled) return;
-    try {
-      const audioConstructor =
-        window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext;
-      if (!audioConstructor) return;
-      const audioCtx = new audioConstructor();
-      const notes = [523.25, 659.25, 783.99];
-      notes.forEach((freq, index) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.12);
-        gain.gain.setValueAtTime(0.12, audioCtx.currentTime + index * 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + index * 0.12 + 0.3);
-        osc.start(audioCtx.currentTime + index * 0.12);
-        osc.stop(audioCtx.currentTime + index * 0.12 + 0.4);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const reactToMascot = (pose: MascotPose, speech: string, xp = 10) => {
-    setMascotPose(pose);
-    setStageSpeech(speech);
-    setAffection((prev) => Math.min(100, prev + Math.max(3, Math.floor(xp / 2))));
-    setEnergy((prev) => (pose === "sleepy" ? Math.min(100, prev + 12) : Math.max(8, prev - 4)));
-    setSparkleSeed((prev) => prev + 1);
-    addXP(xp);
-    playStudyBell();
-  };
-
-  const handleInteraction = (pose: MascotPose) => {
-    const interactions: Record<MascotPose, string> = {
-      idle: "좋아요. 잠깐 대기하면서 다음 계획을 기다릴게요.",
-      happy: "응원 모드 켰어요. 오늘 하나만 끝내도 충분히 좋은 흐름입니다.",
-      curious: "궁금한 게 있으면 물어봐요. 계획을 작게 쪼개드릴게요.",
-      sleepy: "짧게 쉬는 것도 전략이에요. 5분만 숨 고르고 돌아와요.",
-      study: "집중 모드로 전환했습니다. 방해 요소는 잠깐 내려놓기.",
-      dragging: "여기 위치가 마음에 들어요.",
-    };
-    reactToMascot(pose, interactions[pose], pose === "study" ? 18 : 12);
-    addMascotMessage(interactions[pose]);
-  };
-
-  const handleStagePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const rect = stage.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    if (dragStateRef.current.dragging) {
-      dragStateRef.current.moved = true;
-      setStagePosition(clampPosition(x, y));
+  const buyClothing = (item: ClothingItem) => {
+    if (ownedClothingSet.has(item.id)) return;
+    if (item.price > 0 && !spendXP(item.price)) {
+      alert("XP가 부족해요. 공부를 완료해서 XP를 모아주세요.");
       return;
     }
+    setOwnedClothing((prev) => [...prev, item.id]);
+    setEquippedClothing((prev) => ({ ...prev, [item.slot]: item.id }));
   };
 
-  const handleMascotPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragStateRef.current = { dragging: true, moved: false };
-    setMascotPose("dragging");
-    setStageSpeech("원하는 위치로 옮겨주세요.");
-  };
-
-  const handleMascotPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    const wasMoved = dragStateRef.current.moved;
-    dragStateRef.current = { dragging: false, moved: false };
-
-    if (wasMoved) {
-      setMascotPose("idle");
-    }
-  };
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (dragStateRef.current.dragging) return;
-
-      const placedTarget =
-        roomFurniture.length > 0 && Math.random() > 0.45
-          ? roomFurniture[Math.floor(Math.random() * roomFurniture.length)]
-          : null;
-      const furnitureItem = placedTarget ? getFurnitureItem(placedTarget.itemId) : null;
-
-      if (placedTarget && furnitureItem) {
-        setStagePosition(clampPosition(placedTarget.x, Math.max(30, placedTarget.y - 10)));
-        setMascotPose(furnitureItem.usePose);
-        return;
-      }
-
-      setStagePosition((prev) =>
-        clampPosition(
-          prev.x + (Math.random() * 22 - 11),
-          prev.y + (Math.random() * 14 - 7)
-        )
-      );
-      setMascotPose((prev) => (prev === "idle" ? "curious" : "idle"));
-    }, 3600);
-
-    return () => window.clearInterval(interval);
-  }, [roomFurniture]);
-
-  const handleBuyFurniture = (item: FurnitureItem) => {
-    if (ownedFurniture.includes(item.id)) return;
-    if (!spendXP(item.price)) {
-      alert("경험치가 부족합니다.");
-      return;
-    }
-    setOwnedFurniture((prev) => [...prev, item.id]);
-  };
-
-  const openFurnitureModal = () => {
-    setPlacementDraft(roomFurniture);
-    setSelectedFurnitureId(null);
-    setIsFurnitureModalOpen(true);
-  };
-
-  const handlePlacementStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!selectedFurnitureId) return;
-    const stage = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - stage.left) / stage.width) * 100;
-    const y = ((e.clientY - stage.top) / stage.height) * 100;
-
-    setPlacementDraft((prev) => {
-      const existing = prev.find((furniture) => furniture.itemId === selectedFurnitureId);
-      if (existing) {
-        return prev.map((furniture) =>
-          furniture.itemId === selectedFurnitureId
-            ? { ...furniture, ...clampPosition(x, y) }
-            : furniture
-        );
-      }
-
-      return [
-        ...prev,
-        {
-          id: `${selectedFurnitureId}-${Date.now()}`,
-          itemId: selectedFurnitureId,
-          ...clampPosition(x, y),
-        },
-      ];
-    });
-  };
-
-  const removePlacedFurniture = (itemId: string) => {
-    setPlacementDraft((prev) => prev.filter((furniture) => furniture.itemId !== itemId));
-    if (selectedFurnitureId === itemId) setSelectedFurnitureId(null);
-  };
-
-  const saveFurniturePlacement = () => {
-    setRoomFurniture(placementDraft);
-    setIsFurnitureModalOpen(false);
-  };
-
-  const handleAcceptPlan = async (messageId: number, plan: StudyPlanItem[]) => {
-    try {
-      for (const item of plan) {
-        if (!item?.title) continue;
-        await createTask(
-          item.title,
-          item.content || "",
-          null,
-          item.duration || "1시간",
-          null,
-          "#a5d8d1",
-          item.date
-        );
-      }
-      setChatMessages((prev) =>
-        prev.map((msg) => (msg.id === messageId ? { ...msg, planStatus: "added" } : msg))
-      );
-      reactToMascot("happy", `추천 학습 계획 ${plan.length}개를 플래너에 등록했습니다.`, 20);
-      addMascotMessage(`추천 학습 계획 ${plan.length}개를 플래너에 등록했습니다.`);
-    } catch (error) {
-      console.error("Failed to add tasks:", error);
-      alert("플래너에 일정을 추가하는 중 오류가 발생했습니다.");
-    }
-  };
-
-  const handleEditPlan = (messageId: number) => {
-    setChatMessages((prev) =>
-      prev.map((msg) => (msg.id === messageId ? { ...msg, planStatus: "modified" } : msg))
-    );
-    const guidance = "학습 계획을 어떻게 수정할까요? 아래 입력창에 수정하고 싶은 내용을 말씀해주세요.";
-    setChatInput("방금 추천해준 일정을 조금 줄여줘");
-    reactToMascot("curious", guidance, 8);
-    addMascotMessage(guidance);
-  };
-
-  const handleCancelPlan = (messageId: number) => {
-    setChatMessages((prev) =>
-      prev.map((msg) => (msg.id === messageId ? { ...msg, planStatus: "cancelled" } : msg))
-    );
-    reactToMascot("idle", "학습 계획 제안을 취소했습니다.", 5);
-    addMascotMessage("학습 계획 제안을 취소했습니다. 다른 도움이 필요하면 다시 말해주세요.");
-  };
-
-  const handleSendChat = async () => {
-    const text = chatInput.trim();
-    if (!text) return;
-
-    const userMsg: ChatMessage = {
-      id: nextMessageId(),
-      sender: "user",
-      text,
-    };
-    setChatMessages((prev) => [...prev, userMsg]);
-    setChatInput("");
-    reactToMascot("study", "답변을 생각하고 있어요.", 3);
-
-    const history = chatMessages.map((msg) => ({
-      role: (msg.sender === "user" ? "user" : "model") as "user" | "model",
-      parts: [msg.text],
+  const toggleClothing = (item: ClothingItem) => {
+    setEquippedClothing((prev) => ({
+      ...prev,
+      [item.slot]: prev[item.slot] === item.id ? undefined : item.id,
     }));
-
-    const typingId = nextMessageId();
-    try {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: typingId,
-          sender: "mascot",
-          text: "생각 중...",
-        },
-      ]);
-
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history }),
-      });
-
-      const data = (await res.json()) as ChatApiResponse;
-      setChatMessages((prev) => prev.filter((msg) => msg.id !== typingId));
-
-      if (res.ok && data.reply) {
-        const replyText = data.reply;
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: nextMessageId(),
-            sender: "mascot",
-            text: replyText,
-            proposedPlan: data.proposedPlan,
-            planStatus: data.proposedPlan ? "pending" : undefined,
-          },
-        ]);
-        reactToMascot(data.proposedPlan ? "curious" : "happy", "답변을 준비했어요.", 12);
-      } else {
-        const fallback = data.error || "지금은 답변을 만들지 못했어요. 잠시 후 다시 물어봐주세요.";
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: nextMessageId(),
-            sender: "mascot",
-            text: fallback,
-          },
-        ]);
-        reactToMascot("sleepy", fallback, 4);
-      }
-    } catch (error) {
-      console.error(error);
-      setChatMessages((prev) => prev.filter((msg) => msg.id !== typingId));
-      const fallback = "연결이 잠깐 불안정해요. 그래도 오늘 계획은 작게 나눠서 시작해볼 수 있어요.";
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: nextMessageId(),
-          sender: "mascot",
-          text: fallback,
-        },
-      ]);
-      reactToMascot("sleepy", fallback, 4);
-    }
   };
 
-  useEffect(() => {
-    if (chatViewRef.current) {
-      chatViewRef.current.scrollTop = chatViewRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
-
-  const handleSelectMascot = (key: MascotKey) => {
-    const imageUrl =
-      key === "custom" ? settings.customMascotUrl || "" : MASCOT_IMAGES[key];
-    updateCharacter(key, MASCOT_NAMES[key], imageUrl);
-    reactToMascot("happy", `파트너가 ${MASCOT_NAMES[key]}(으)로 교체되었습니다.`, 10);
-    addMascotMessage(`파트너가 ${MASCOT_NAMES[key]}(으)로 교체되었습니다.`);
+  const placeFurnitureFromStorage = (item: FurnitureItem) => {
+    setRoomFurniture((prev) => [
+      ...prev,
+      {
+        id: `${item.id}-${Date.now()}`,
+        itemId: item.id,
+        x: item.defaultX,
+        y: item.defaultY,
+      },
+    ]);
+    setEditMode(true);
+    setTab("home");
   };
 
-  const handleSaveCustomImage = () => {
-    const url = customUrlInput.trim();
-    if (!url) {
-      alert("이미지 주소를 입력하세요.");
-      return;
-    }
-    updateCharacter("custom", "커스텀", url);
-    reactToMascot("happy", "나만의 커스텀 캐릭터 이미지가 등록되었습니다.", 15);
-    addMascotMessage("나만의 커스텀 캐릭터 이미지가 등록되었습니다.");
+  const removeFurniture = (id: string) => {
+    setRoomFurniture((prev) => prev.filter((item) => item.id !== id));
+    if (selectedFurniture === id) setSelectedFurniture(null);
   };
 
-  const handleCustomMascotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      updateCharacter("custom", "커스텀", dataUrl);
-      setCustomUrlInput(dataUrl);
-      reactToMascot("happy", "나만의 커스텀 캐릭터 사진이 등록되었습니다.", 15);
-      addMascotMessage("나만의 커스텀 캐릭터 사진이 등록되었습니다.");
-    };
-    reader.readAsDataURL(file);
+  const givePat = () => {
+    addXP(3);
   };
 
-  const mascotsList: Array<{ key: MascotKey; label: string; src: string }> = [
-    { key: "woolini", label: "울리니", src: MASCOT_IMAGES.woolini },
-    { key: "yang-i", label: "양양이", src: MASCOT_IMAGES["yang-i"] },
-    { key: "gom-i", label: "곰곰이", src: MASCOT_IMAGES["gom-i"] },
-    {
-      key: "custom",
-      label: "커스텀",
-      src: settings.customMascotUrl || MASCOT_IMAGES.custom,
-    },
-  ];
+  const equippedItems = Object.values(equippedClothing)
+    .map((id) => getClothing(id))
+    .filter(Boolean) as ClothingItem[];
 
   return (
-    <div className="flex-1 flex flex-col p-3.5 space-y-3 overflow-y-auto no-scrollbar pb-16">
-      <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-variant/20 flex items-center gap-3 relative bubbly-shadow shrink-0">
-        <button
-          type="button"
-          className={`w-16 h-16 rounded-full bg-primary-container/20 flex items-center justify-center overflow-hidden border border-primary/20 cursor-grab select-none active:cursor-grabbing transition-transform mascot-avatar mascot-pose-${mascotPose}`}
-          onPointerDown={handleMascotPointerDown}
-          onPointerUp={handleMascotPointerUp}
-          aria-label="캐릭터 이동"
-        >
-          <img className="w-11 h-11 object-contain pointer-events-none" src={getActiveMascotUrl()} alt="Mascot" />
-        </button>
-        <div className="flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-headline font-bold text-xs text-primary">{MASCOT_NAMES[activeMascot]}</h3>
-            <span className="text-[8px] bg-secondary-container/50 text-on-secondary-container px-2 py-0.5 rounded-full font-bold">
-              {POSE_LABELS[mascotPose]}
-            </span>
-          </div>
-          <div className="mt-1.5 space-y-1">
-            <div className="flex items-center justify-between text-[8px] font-bold text-on-surface-variant">
-              <span>Level {mascotLevel}</span>
-              <span>{mascotXP} / 1000 XP</span>
-            </div>
-            <div className="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-              <div className="bg-primary h-full rounded-full transition-all duration-500" style={{ width: `${xpPercent}%` }} />
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="relative flex-1 overflow-hidden bg-[#e8ffd9] text-on-surface">
       <div
-        ref={stageRef}
-        onPointerMove={handleStagePointerMove}
-        className="relative h-56 shrink-0 overflow-hidden rounded-2xl border border-surface-variant/30 bg-surface-container-lowest bubbly-shadow mascot-stage"
+        ref={roomRef}
+        className="relative h-full min-h-[620px] overflow-hidden"
+        onPointerMove={handleRoomPointerMove}
+        onPointerUp={stopFurnitureDrag}
+        onPointerCancel={stopFurnitureDrag}
       >
-        <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={openFurnitureModal}
-            className="px-2.5 py-1 rounded-full text-[9px] font-bold bg-primary text-white border border-primary transition-all"
-          >
-            가구 배치
-          </button>
-          <button
-            type="button"
-            onClick={() => setStagePosition({ x: 50, y: 54 })}
-            className="px-2.5 py-1 rounded-full text-[9px] font-bold bg-white/70 dark:bg-black/20 text-on-surface-variant border border-surface-variant/40"
-          >
-            제자리
-          </button>
+        <div className="absolute left-6 top-8 z-30 rounded-full bg-white/90 px-4 py-2 text-xs font-extrabold text-[#3f6b31] shadow-md">
+          ♥ 포근한 기분
         </div>
 
-        <div className="absolute right-3 top-3 z-10 grid grid-cols-2 gap-1 text-[8px] font-bold">
-          <div className="rounded-lg bg-white/75 dark:bg-black/25 px-2 py-1 text-on-surface-variant">
-            친밀도 {affection}%
-          </div>
-          <div className="rounded-lg bg-white/75 dark:bg-black/25 px-2 py-1 text-on-surface-variant">
-            에너지 {energy}%
-          </div>
+        <div className="absolute inset-x-0 bottom-20 h-[47%] bg-[#fff7ef]" />
+        <div className="absolute inset-x-0 bottom-20 grid h-[47%] grid-cols-4 border-t border-[#eadfd5]">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <span key={index} className="border-r border-[#eadfd5]/80 last:border-r-0" />
+          ))}
         </div>
+        <div className="absolute left-8 top-[68%] h-16 w-44 -translate-y-1/2 rounded-[50%] bg-[#ead681]/35 blur-sm" />
 
-        <div className="absolute inset-x-5 bottom-5 h-10 rounded-[50%] bg-primary/10 blur-sm" />
-        <div className="absolute inset-x-8 bottom-7 h-px bg-primary/15" />
-
-        {roomFurniture.map((furniture) => {
-          const item = getFurnitureItem(furniture.itemId);
+        {roomFurniture.map((placed) => {
+          const item = getFurniture(placed.itemId);
           if (!item) return null;
+          const isSelected = selectedFurniture === placed.id;
           return (
-            <div
-              key={furniture.id}
-              className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-xl border border-white/60 bg-white/65 px-2 py-1 shadow-sm backdrop-blur-sm"
-              style={{ left: `${furniture.x}%`, top: `${furniture.y}%` }}
+            <button
+              key={placed.id}
+              type="button"
+              onPointerDown={(e) => handleFurniturePointerDown(e, placed.id)}
+              onClick={() => {
+                if (editMode) setSelectedFurniture(placed.id);
+              }}
+              className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 touch-none select-none flex-col items-center justify-center rounded-2xl border bg-white/55 shadow-lg backdrop-blur-sm transition ${
+                editMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+              } ${isSelected ? "border-[#3f6b31] ring-4 ring-[#b9ee9b]/60" : "border-white/70"}`}
+              style={{
+                left: `${placed.x}%`,
+                top: `${placed.y}%`,
+                width: item.width,
+                height: item.height,
+              }}
+              aria-label={`${item.name} 이동`}
             >
-              <span className="material-symbols-outlined text-lg text-primary">{item.icon}</span>
-              <span className="text-[7px] font-bold text-on-surface-variant">{item.name}</span>
-            </div>
+              <span className="text-3xl leading-none drop-shadow-sm">{item.emoji}</span>
+              <span className="mt-1 rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold text-[#496044]">
+                {item.name}
+              </span>
+            </button>
           );
         })}
 
-        <div
-          className={`absolute z-20 transition-[left,top] duration-500 ease-out mascot-stage-body mascot-pose-${mascotPose}`}
-          style={{
-            left: `${stagePosition.x}%`,
-            top: `${stagePosition.y}%`,
-          }}
-        >
-          {stageSpeech && (
-            <div className="absolute bottom-full left-1/2 mb-2 w-44 -translate-x-1/2 rounded-xl rounded-br-sm bg-secondary px-3 py-2 text-center text-[9px] font-bold leading-snug text-white shadow-md">
-              {stageSpeech}
-            </div>
-          )}
-          <button
-            type="button"
-            onPointerDown={handleMascotPointerDown}
-            onPointerUp={handleMascotPointerUp}
-            className="relative flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full border border-white/70 bg-white/55 p-3 shadow-xl backdrop-blur-md active:cursor-grabbing"
-            aria-label="무대 위 캐릭터"
-          >
-            <img className="h-16 w-16 object-contain pointer-events-none" src={getActiveMascotUrl()} alt="Mascot" />
-            <span key={sparkleSeed} className="mascot-sparkle" />
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-1.5 shrink-0">
-        <button onClick={() => handleInteraction("happy")} className="py-2 rounded-xl bg-primary text-white text-[9px] font-bold">
-          응원
-        </button>
-        <button onClick={() => handleInteraction("curious")} className="py-2 rounded-xl bg-secondary text-white text-[9px] font-bold">
-          질문
-        </button>
-        <button onClick={() => handleInteraction("study")} className="py-2 rounded-xl bg-tertiary text-white text-[9px] font-bold">
-          집중
-        </button>
-        <button onClick={() => handleInteraction("sleepy")} className="py-2 rounded-xl bg-surface-container-highest text-on-surface-variant text-[9px] font-bold">
-          휴식
-        </button>
-      </div>
-
-      <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-variant/20 flex flex-col gap-2 shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[9px] font-bold text-on-surface-variant block uppercase tracking-wider select-none">
-            가구 상점
-          </span>
-          <button
-            type="button"
-            onClick={openFurnitureModal}
-            className="px-3 py-1.5 rounded-xl bg-secondary text-white text-[9px] font-bold active:scale-95 transition-all"
-          >
-            배치하기
-          </button>
-        </div>
-        <div className="grid grid-cols-5 gap-1.5">
-          {FURNITURE_CATALOG.map((item) => {
-            const owned = ownedFurniture.includes(item.id);
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleBuyFurniture(item)}
-                disabled={owned}
-                className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1 text-center transition-all ${
-                  owned
-                    ? "border-primary/40 bg-primary-container/20 text-primary"
-                    : "border-surface-variant bg-surface-container-lowest text-on-surface hover:border-primary/50"
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">{item.icon}</span>
-                <span className="text-[7px] font-bold leading-tight">{item.name}</span>
-                <span className="text-[7px] font-bold text-on-surface-variant">
-                  {owned ? "보유" : `${item.price} XP`}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col bg-surface-container-lowest dark:bg-surface-container rounded-2xl p-3.5 border border-surface-variant/30 min-h-[180px] bubbly-shadow shrink-0">
-        <span className="text-[9px] font-bold text-secondary uppercase tracking-wider block mb-2 select-none">
-          울리니 AI 스터디 메이트
-        </span>
-        <div
-          ref={chatViewRef}
-          className="flex-1 bg-surface-container-low rounded-xl p-2.5 border border-surface-variant/20 overflow-y-auto custom-scrollbar flex flex-col gap-2 max-h-[170px]"
-        >
-          {chatMessages.length === 0 ? (
-            <p className="text-[9px] text-on-surface-variant/50 italic text-center my-auto select-none">
-              캐릭터와 상호작용하거나 질문을 보내보세요.
-            </p>
-          ) : (
-            chatMessages.map((msg) =>
-              msg.sender === "user" ? (
-                <div key={msg.id} className="flex gap-2 items-start justify-end">
-                  <div className="bg-primary text-white px-3 py-1.5 rounded-xl rounded-tr-none text-xs leading-normal max-w-[80%]">
-                    {msg.text}
-                  </div>
-                </div>
-              ) : (
-                <div key={msg.id} className="flex gap-2 items-start">
-                  <div className="w-6 h-6 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden shrink-0 mt-0.5">
-                    <img className="w-5 h-5 object-contain" src={getActiveMascotUrl()} alt="Mascot" />
-                  </div>
-                  <div className="flex flex-col gap-2 max-w-[80%]">
-                    <div className="bg-secondary/10 text-on-secondary-container px-3 py-1.5 rounded-xl rounded-tl-none text-xs leading-normal w-full">
-                      {msg.text}
-                    </div>
-                    {msg.proposedPlan && msg.proposedPlan.length > 0 && (
-                      <div className="bg-surface-container-low border border-surface-variant/40 rounded-xl p-3 flex flex-col gap-2 bubbly-shadow mt-1 text-on-surface">
-                        <span className="text-[10px] font-bold text-primary flex items-center gap-1 select-none">
-                          <span className="material-symbols-outlined text-xs">auto_awesome</span>
-                          AI 추천 학습 계획
-                        </span>
-                        <div className="flex flex-col gap-1.5 max-h-[150px] overflow-y-auto pr-1">
-                          {msg.proposedPlan.map((item, idx) => (
-                            <div key={idx} className="bg-surface-container-highest/50 border border-surface-variant/25 rounded-lg p-2 flex flex-col gap-0.5">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[9px] font-bold text-on-surface-variant">{item.date}</span>
-                                <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">{item.duration}</span>
-                              </div>
-                              <span className="text-xs font-bold text-on-surface">{item.title}</span>
-                              {item.content && <span className="text-[9px] text-on-surface-variant/85 leading-normal">{item.content}</span>}
-                            </div>
-                          ))}
-                        </div>
-                        {msg.planStatus === "pending" && (
-                          <div className="flex gap-1.5 mt-1 pt-1.5 border-t border-surface-variant/10">
-                            <button onClick={() => handleAcceptPlan(msg.id, msg.proposedPlan!)} className="flex-1 py-1 bg-primary text-white text-[9px] font-bold rounded-lg active:scale-95 transition-all cursor-pointer text-center">
-                              추가하기
-                            </button>
-                            <button onClick={() => handleEditPlan(msg.id)} className="flex-1 py-1 border border-primary text-primary hover:bg-primary/5 text-[9px] font-bold rounded-lg active:scale-95 transition-all cursor-pointer text-center">
-                              수정하기
-                            </button>
-                            <button onClick={() => handleCancelPlan(msg.id)} className="py-1 px-2.5 bg-surface-container-highest text-on-surface-variant hover:bg-surface-container-high text-[9px] font-bold rounded-lg active:scale-95 transition-all cursor-pointer text-center">
-                              취소
-                            </button>
-                          </div>
-                        )}
-                        {msg.planStatus === "added" && (
-                          <div className="text-center text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 py-1 rounded-lg mt-1 select-none border border-emerald-500/10">
-                            플래너에 등록되었습니다.
-                          </div>
-                        )}
-                        {msg.planStatus === "cancelled" && (
-                          <div className="text-center text-[9px] font-bold text-on-surface-variant/60 bg-surface-container-high py-1 rounded-lg mt-1 select-none border border-surface-variant/10">
-                            계획 등록이 취소되었습니다.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            )
-          )}
-        </div>
-        <div className="flex gap-2 mt-2 pt-2 border-t border-surface-variant/20">
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSendChat();
-            }}
-            placeholder="학습 피드백이나 질문을 해보세요..."
-            className="flex-1 bg-surface-container-low border border-outline-variant/60 rounded-full px-4 py-1.5 text-xs focus:outline-none focus:border-secondary text-on-surface"
+        <div className="absolute left-1/2 top-[42%] z-20 h-[300px] w-[260px] -translate-x-1/2">
+          <img
+            src={mascotUrl}
+            alt="울리니 캐릭터"
+            className="absolute left-1/2 top-1/2 h-[240px] w-[240px] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-2xl"
+            draggable={false}
           />
-          <button
-            onClick={handleSendChat}
-            className="w-7 h-7 rounded-full bg-secondary text-on-secondary flex items-center justify-center shadow-md active:scale-90 transition-all shrink-0 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[13px]">send</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-variant/20 flex flex-col gap-2 shrink-0">
-        <span className="text-[9px] font-bold text-on-surface-variant block uppercase tracking-wider select-none">
-          학습 메이트 캐릭터 선택 & 나만의 이미지 추가
-        </span>
-        <div className="grid grid-cols-4 gap-1.5">
-          {mascotsList.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => handleSelectMascot(m.key)}
-              className={`flex flex-col items-center gap-1 p-1 rounded-xl border transition-all cursor-pointer ${
-                activeMascot === m.key
-                  ? "border-2 border-primary bg-primary-container/20"
-                  : "border-surface-variant bg-surface-container-lowest opacity-85 hover:opacity-100"
-              }`}
+          {equippedItems.map((item) => (
+            <span
+              key={item.id}
+              className={`pointer-events-none absolute z-30 drop-shadow-md ${item.className}`}
+              aria-hidden="true"
             >
-              <img className={`w-7 h-7 object-contain ${m.key === "custom" ? "rounded-full" : ""}`} src={m.src} alt={m.label} />
-              <span className="text-[7px] font-bold">{m.label}</span>
-            </button>
+              {item.emoji}
+            </span>
           ))}
         </div>
 
-        <div className="flex flex-col gap-1.5 mt-1 border-t border-surface-variant/20 pt-2 text-[9px]">
-          <div className="flex gap-1.5 items-center">
-            <input
-              type="text"
-              value={customUrlInput}
-              onChange={(e) => setCustomUrlInput(e.target.value)}
-              placeholder="나만의 캐릭터 이미지 주소..."
-              className="flex-1 bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-1.5 text-[9px] focus:outline-none focus:border-primary text-on-surface"
-            />
-            <button onClick={handleSaveCustomImage} className="px-3 py-1.5 bg-primary text-white text-[9px] font-bold rounded-xl active:scale-95 transition-all cursor-pointer">
-              등록
-            </button>
-          </div>
-          <div className="flex justify-between items-center gap-1.5 border-t border-dashed border-surface-variant/10 pt-1.5">
-            <span className="text-on-surface-variant/60 font-semibold pl-1">
-              또는 로컬 사진 파일 업로드:
-            </span>
-            <label className="px-3 py-1 bg-secondary text-white text-[9px] font-bold rounded-xl cursor-pointer hover:bg-secondary/95 transition-colors shrink-0 text-center select-none active:scale-95">
-              <span>사진 선택</span>
-              <input type="file" accept="image/*" onChange={handleCustomMascotUpload} className="hidden" />
-            </label>
-          </div>
+        {editMode && selectedFurniture && (
+          <button
+            type="button"
+            onClick={() => removeFurniture(selectedFurniture)}
+            className="absolute bottom-28 left-1/2 z-40 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-error shadow-lg"
+          >
+            선택한 가구 치우기
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setEditMode((prev) => !prev)}
+          className={`absolute bottom-32 right-7 z-40 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-xl transition ${
+            editMode ? "bg-[#ba1a1a]" : "bg-[#3f6b31]"
+          }`}
+          aria-label="방 편집"
+        >
+          <span className="material-symbols-outlined text-3xl">{editMode ? "check" : "edit"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={givePat}
+          className="absolute bottom-32 left-7 z-40 rounded-full bg-white/90 px-4 py-2 text-xs font-extrabold text-[#3f6b31] shadow-md"
+        >
+          쓰다듬기 +3XP
+        </button>
+
+        {tab === "shop" && (
+          <Panel title="상점" onClose={() => setTab("home")}>
+            <div className="mb-3 flex rounded-full bg-[#edf8e5] p-1">
+              <button
+                type="button"
+                onClick={() => setShopKind("furniture")}
+                className={`flex-1 rounded-full py-2 text-xs font-extrabold ${shopKind === "furniture" ? "bg-white text-[#3f6b31] shadow" : "text-[#6d8066]"}`}
+              >
+                가구 6종
+              </button>
+              <button
+                type="button"
+                onClick={() => setShopKind("clothing")}
+                className={`flex-1 rounded-full py-2 text-xs font-extrabold ${shopKind === "clothing" ? "bg-white text-[#3f6b31] shadow" : "text-[#6d8066]"}`}
+              >
+                옷 6종
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {shopKind === "furniture"
+                ? FURNITURE_CATALOG.map((item) => {
+                    const owned = ownedFurnitureSet.has(item.id);
+                    return (
+                      <ShopButton
+                        key={item.id}
+                        icon={item.emoji}
+                        name={item.name}
+                        meta={owned ? "보유중" : item.price > 0 ? `${item.price} XP` : "무료 구매"}
+                        disabled={owned}
+                        onClick={() => buyFurniture(item)}
+                      />
+                    );
+                  })
+                : CLOTHING_CATALOG.map((item) => {
+                    const owned = ownedClothingSet.has(item.id);
+                    return (
+                      <ShopButton
+                        key={item.id}
+                        icon={item.emoji}
+                        name={item.name}
+                        meta={owned ? `${SLOT_LABELS[item.slot]} 보유` : item.price > 0 ? `${item.price} XP` : "무료 구매"}
+                        disabled={owned}
+                        onClick={() => buyClothing(item)}
+                      />
+                    );
+                  })}
+            </div>
+          </Panel>
+        )}
+
+        {tab === "storage" && (
+          <Panel title="보관함" onClose={() => setTab("home")}>
+            <p className="mb-3 text-[11px] font-bold text-on-surface-variant">
+              옷은 울리니에게 바로 입히고, 가구는 방에 꺼낸 뒤 원하는 위치로 드래그하세요.
+            </p>
+            <div className="mb-4">
+              <h3 className="mb-2 text-xs font-extrabold text-[#3f6b31]">옷</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {ownedClothing.length === 0 ? (
+                  <EmptyBox label="상점에서 옷을 구매해 주세요." />
+                ) : (
+                  ownedClothing.map((id) => {
+                    const item = getClothing(id);
+                    if (!item) return null;
+                    const equipped = equippedClothing[item.slot] === item.id;
+                    return (
+                      <ShopButton
+                        key={item.id}
+                        icon={item.emoji}
+                        name={item.name}
+                        meta={equipped ? "착용중" : `${SLOT_LABELS[item.slot]} 착용`}
+                        active={equipped}
+                        onClick={() => toggleClothing(item)}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            <div>
+              <h3 className="mb-2 text-xs font-extrabold text-[#3f6b31]">가구</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {ownedFurniture.length === 0 ? (
+                  <EmptyBox label="상점에서 가구를 구매해 주세요." />
+                ) : (
+                  ownedFurniture.map((id) => {
+                    const item = getFurniture(id);
+                    if (!item) return null;
+                    return (
+                      <ShopButton
+                        key={item.id}
+                        icon={item.emoji}
+                        name={item.name}
+                        meta="방에 배치"
+                        onClick={() => placeFurnitureFromStorage(item)}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </Panel>
+        )}
+
+        <div className="absolute bottom-0 left-0 right-0 z-50 grid h-20 grid-cols-3 rounded-t-[28px] bg-[#dcffd0]/95 px-8 py-2 shadow-[0_-8px_22px_rgba(63,107,49,0.08)] backdrop-blur">
+          <TabButton active={tab === "home"} icon="home" label="홈" onClick={() => setTab("home")} />
+          <TabButton active={tab === "shop"} icon="shopping_bag" label="상점" onClick={() => setTab("shop")} />
+          <TabButton active={tab === "storage"} icon="inventory_2" label="보관함" onClick={() => setTab("storage")} />
+        </div>
+
+        <div className="absolute right-5 top-8 z-30 rounded-full bg-white/90 px-3 py-2 text-[11px] font-extrabold text-[#3f6b31] shadow-md">
+          Lv.{mascotLevel} · {mascotXP} XP
         </div>
       </div>
+    </div>
+  );
+}
 
-      {isFurnitureModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[88vh] w-full max-w-[360px] flex-col rounded-2xl border border-surface-variant/30 bg-surface p-4 shadow-2xl">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-headline text-sm font-bold text-primary">가구 배치</h3>
-                <p className="mt-0.5 text-[9px] font-semibold text-on-surface-variant">
-                  보유 가구를 선택한 뒤 방 안을 눌러 위치를 정하세요.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFurnitureModalOpen(false)}
-                className="rounded-full p-1 hover:bg-surface-container-high"
-                aria-label="닫기"
-              >
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
-            </div>
+function TabButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-1 rounded-full text-xs font-extrabold transition ${
+        active ? "bg-[#aee894] text-[#3f6b31]" : "text-[#4f5f4b]"
+      }`}
+    >
+      <span className="material-symbols-outlined text-2xl">{icon}</span>
+      {label}
+    </button>
+  );
+}
 
-            <div
-              onClick={handlePlacementStageClick}
-              className="relative h-56 shrink-0 overflow-hidden rounded-2xl border border-surface-variant/30 bg-surface-container-lowest mascot-stage"
-            >
-              <div className="absolute inset-x-5 bottom-5 h-10 rounded-[50%] bg-primary/10 blur-sm" />
-              <div className="absolute inset-x-8 bottom-7 h-px bg-primary/15" />
+function Panel({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-x-4 bottom-24 z-50 max-h-[48%] overflow-y-auto rounded-3xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-base font-extrabold text-[#3f6b31]">{title}</h2>
+        <button type="button" onClick={onClose} className="rounded-full bg-[#edf8e5] p-1.5">
+          <span className="material-symbols-outlined text-base">close</span>
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
 
-              {placementDraft.map((furniture) => {
-                const item = getFurnitureItem(furniture.itemId);
-                if (!item) return null;
-                const selected = selectedFurnitureId === item.id;
-                return (
-                  <button
-                    key={furniture.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFurnitureId(item.id);
-                    }}
-                    className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-xl border px-2 py-1 text-center shadow-sm backdrop-blur-sm ${
-                      selected
-                        ? "border-primary bg-primary-container/80 text-primary"
-                        : "border-white/60 bg-white/70 text-on-surface"
-                    }`}
-                    style={{ left: `${furniture.x}%`, top: `${furniture.y}%` }}
-                  >
-                    <span className="material-symbols-outlined text-lg">{item.icon}</span>
-                    <span className="text-[7px] font-bold">{item.name}</span>
-                  </button>
-                );
-              })}
-            </div>
+function ShopButton({
+  icon,
+  name,
+  meta,
+  disabled,
+  active,
+  onClick,
+}: {
+  icon: string;
+  name: string;
+  meta: string;
+  disabled?: boolean;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex min-h-20 items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.98] ${
+        active
+          ? "border-[#3f6b31] bg-[#e8ffd9]"
+          : disabled
+          ? "border-[#d8e7d1] bg-[#f4fbf0] opacity-75"
+          : "border-[#d8e7d1] bg-white"
+      }`}
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#edf8e5] text-3xl">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-xs font-extrabold text-on-surface">{name}</span>
+        <span className="mt-1 block text-[10px] font-bold text-on-surface-variant">{meta}</span>
+      </span>
+    </button>
+  );
+}
 
-            <div className="mt-3 grid max-h-32 grid-cols-2 gap-1.5 overflow-y-auto pr-1 custom-scrollbar">
-              {ownedFurniture.length === 0 ? (
-                <div className="col-span-2 rounded-xl bg-surface-container-low p-3 text-center text-[10px] font-bold text-on-surface-variant">
-                  먼저 가구를 구매해 주세요.
-                </div>
-              ) : (
-                ownedFurniture.map((itemId) => {
-                  const item = getFurnitureItem(itemId);
-                  if (!item) return null;
-                  const placed = placementDraft.some((furniture) => furniture.itemId === item.id);
-                  return (
-                    <div key={item.id} className="flex items-center gap-1.5 rounded-xl border border-surface-variant/40 bg-surface-container-lowest p-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedFurnitureId(item.id)}
-                        className={`flex flex-1 items-center gap-1.5 rounded-lg px-1.5 py-1 text-left text-[9px] font-bold ${
-                          selectedFurnitureId === item.id
-                            ? "bg-primary text-white"
-                            : "bg-surface-container-low text-on-surface"
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-sm">{item.icon}</span>
-                        <span>{item.name}</span>
-                      </button>
-                      {placed && (
-                        <button
-                          type="button"
-                          onClick={() => removePlacedFurniture(item.id)}
-                          className="rounded-lg bg-surface-container-high px-1.5 py-1 text-[8px] font-bold text-on-surface-variant"
-                        >
-                          제거
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="mt-3 flex gap-2 border-t border-surface-variant/20 pt-3">
-              <button
-                type="button"
-                onClick={() => setIsFurnitureModalOpen(false)}
-                className="flex-1 rounded-xl bg-surface-container-highest py-2 text-[10px] font-bold text-on-surface-variant"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={saveFurniturePlacement}
-                className="flex-[2] rounded-xl bg-primary py-2 text-[10px] font-bold text-white"
-              >
-                저장
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+function EmptyBox({ label }: { label: string }) {
+  return (
+    <div className="col-span-2 rounded-2xl bg-[#f4fbf0] p-4 text-center text-xs font-bold text-on-surface-variant">
+      {label}
     </div>
   );
 }

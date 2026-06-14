@@ -43,6 +43,13 @@ export interface RoomFurniture {
   y: number;
 }
 
+export interface EquippedClothing {
+  head?: string;
+  neck?: string;
+  body?: string;
+  hand?: string;
+}
+
 export interface AppSettings {
   username: string;
   goalHours: string;
@@ -87,6 +94,10 @@ interface AppContextType {
   setOwnedFurniture: React.Dispatch<React.SetStateAction<string[]>>;
   roomFurniture: RoomFurniture[];
   setRoomFurniture: React.Dispatch<React.SetStateAction<RoomFurniture[]>>;
+  ownedClothing: string[];
+  setOwnedClothing: React.Dispatch<React.SetStateAction<string[]>>;
+  equippedClothing: EquippedClothing;
+  setEquippedClothing: React.Dispatch<React.SetStateAction<EquippedClothing>>;
   isLoggedIn: boolean;
   setIsLoggedIn: (loginState: boolean) => void;
   currentActiveTab: string;
@@ -141,6 +152,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [mascotXP, setMascotXP] = useState(0);
   const [ownedFurniture, setOwnedFurniture] = useState<string[]>([]);
   const [roomFurniture, setRoomFurniture] = useState<RoomFurniture[]>([]);
+  const [ownedClothing, setOwnedClothing] = useState<string[]>([]);
+  const [equippedClothing, setEquippedClothing] = useState<EquippedClothing>({});
 
   // Initialize dates
   useEffect(() => {
@@ -344,6 +357,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const storedRoomFurniture = localStorage.getItem("sp_roomFurniture");
       if (storedRoomFurniture) setRoomFurniture(JSON.parse(storedRoomFurniture));
 
+      const storedOwnedClothing = localStorage.getItem("sp_ownedClothing");
+      if (storedOwnedClothing) setOwnedClothing(JSON.parse(storedOwnedClothing));
+
+      const storedEquippedClothing = localStorage.getItem("sp_equippedClothing");
+      if (storedEquippedClothing) setEquippedClothing(JSON.parse(storedEquippedClothing));
+
       const loginState = localStorage.getItem("sp_logged_in");
       if (loginState === "true") setIsLoggedIn(true);
     } catch (e) {
@@ -411,6 +430,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window === "undefined") return;
     localStorage.setItem("sp_roomFurniture", JSON.stringify(roomFurniture));
   }, [roomFurniture]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("sp_ownedClothing", JSON.stringify(ownedClothing));
+  }, [ownedClothing]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("sp_equippedClothing", JSON.stringify(equippedClothing));
+  }, [equippedClothing]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -860,6 +889,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setOwnedFurniture,
         roomFurniture,
         setRoomFurniture,
+        ownedClothing,
+        setOwnedClothing,
+        equippedClothing,
+        setEquippedClothing,
         isLoggedIn,
         setIsLoggedIn,
         currentActiveTab,
