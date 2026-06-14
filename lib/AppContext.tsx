@@ -45,8 +45,11 @@ export interface RoomFurniture {
 
 export interface EquippedClothing {
   head?: string;
+  face?: string;
   neck?: string;
   body?: string;
+  back?: string;
+  feet?: string;
   hand?: string;
 }
 
